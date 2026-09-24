@@ -1,0 +1,17 @@
+# Local credentials and environment configuration
+.env*
+.dev.vars*
+
+# Dependencies and generated output
+node_modules/
+.next/
+.open-next/
+.wrangler/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+
+# Operating system files
+.DS_Store
+Thumbs.db
