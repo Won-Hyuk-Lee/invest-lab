@@ -1,5 +1,6 @@
 # Local credentials and environment configuration
 .env*
+!.env.example
 .dev.vars*
 
 # Dependencies and generated output
@@ -11,6 +12,15 @@ dist/
 coverage/
 *.tsbuildinfo
 *.log
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+*.pyc
+.local/
+playwright-report/
+test-results/
 
 # Operating system files
 .DS_Store
