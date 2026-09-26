@@ -25,6 +25,8 @@ class StrategyRepository(Protocol):
 class PortfolioRepository(Protocol):
     def snapshot(self) -> dict: ...
 
+    def order_result(self, request_id: str) -> dict | None: ...
+
     def buy(
         self,
         symbol: str,

@@ -82,6 +82,11 @@ class Workspace:
         return self.strategies.save(Strategy(**values), expected_version)
 
     def buy(self, symbol: str, quantity: int, request_id: str) -> dict:
+        previous = self.portfolio.order_result(request_id)
+        if previous:
+            if previous["symbol"] != symbol or previous["quantity"] != quantity:
+                raise ValueError("같은 주문 식별자를 다른 주문에 사용할 수 없습니다.")
+            return previous
         if symbol not in {i.symbol for i in self.market.instruments()}:
             raise LookupError("등록되지 않은 종목입니다.")
         if type(quantity) is not int or not 1 <= quantity <= 100000:
@@ -90,6 +95,15 @@ class Workspace:
         age = (self.clock.now() - quote.observed_at).total_seconds()
         if not 0 <= age <= 300:
             raise ValueError("시세가 오래되었습니다. 새로고침한 뒤 다시 시도하세요.")
+        marks = {symbol: str(quote.price)}
+        for position in self.portfolio.snapshot()["positions"]:
+            held = position["symbol"]
+            if held in marks:
+                continue
+            held_quote = self.market.quote(held)
+            if not 0 <= (self.clock.now() - held_quote.observed_at).total_seconds() <= 300:
+                raise ValueError("보유 종목 시세가 오래되었습니다.")
+            marks[held] = str(held_quote.price)
         return self.portfolio.buy(
             symbol,
             quantity,
@@ -98,5 +112,5 @@ class Workspace:
             self.strategies.latest().max_position_pct,
             self.clock.now(),
             self.market.source,
-            {i.symbol: str(self.market.quote(i.symbol).price) for i in self.market.instruments()},
+            marks,
         )

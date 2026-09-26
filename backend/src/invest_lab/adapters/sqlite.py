@@ -6,12 +6,9 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
+from invest_lab.domain.errors import VersionConflict
 from invest_lab.domain.models import Strategy
 from invest_lab.domain.trading import plan_purchase
-
-
-class VersionConflict(Exception):
-    pass
 
 
 class SQLiteStore:
@@ -58,6 +55,13 @@ class SQLiteStore:
                 "SELECT payload FROM strategies ORDER BY version DESC LIMIT 1"
             ).fetchone()
             return Strategy(**json.loads(row[0]))
+
+    def order_result(self, request_id: str) -> dict | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM orders WHERE request_id=?", (request_id,)
+            ).fetchone()
+            return dict(row) if row else None
 
     def versions(self) -> list[Strategy]:
         with self.connect() as connection:

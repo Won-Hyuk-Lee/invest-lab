@@ -6,6 +6,15 @@ from typing import Literal
 AssetKind = Literal["kospi", "etf_kr", "etf_us"]
 
 
+class FrozenWeights(dict):
+    """JSON/asdict-compatible immutable copy, including in-place dictionary operations."""
+
+    def _deny(self, *args, **kwargs):
+        raise TypeError("저장한 가중치는 변경할 수 없습니다. 새 전략 버전을 만드세요.")
+
+    __setitem__ = __delitem__ = clear = pop = popitem = setdefault = update = __ior__ = _deny
+
+
 @dataclass(frozen=True)
 class Instrument:
     symbol: str
@@ -68,6 +77,9 @@ class Strategy:
             raise ValueError("점수 또는 보유 비중 범위를 확인하세요.")
         if not self.name.strip() or len(self.name) > 60:
             raise ValueError("전략 이름은 1~60자여야 합니다.")
+        if type(self.version) is not int or self.version < 1:
+            raise ValueError("전략 버전은 양의 정수여야 합니다.")
+        object.__setattr__(self, "weights", FrozenWeights(self.weights))
 
 
 @dataclass(frozen=True)

@@ -25,7 +25,9 @@ def validate_bars(bars: list[Bar]) -> None:
             raise ValueError("가격은 양수이며 유한해야 합니다.")
         if bar.low > min(bar.open, bar.close) or bar.high < max(bar.open, bar.close):
             raise ValueError("OHLC 가격 범위를 확인하세요.")
-        if bar.volume < 0 or (i and bars[i - 1].session >= bar.session):
+        if type(bar.volume) is not int or bar.volume < 0:
+            raise ValueError("거래량은 0 이상의 정수여야 합니다.")
+        if i and bars[i - 1].session >= bar.session:
             raise ValueError("거래일은 중복 없이 오름차순이어야 하며 거래량은 음수일 수 없습니다.")
 
 
