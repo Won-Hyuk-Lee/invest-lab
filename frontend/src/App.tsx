@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -20,13 +20,36 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { api, kindLabels, pct, tagLabels, won } from "./api";
+import {
+  api,
+  ApiError,
+  kindLabels,
+  pct,
+  tagLabels,
+  won,
+  reasonLabels,
+} from "./api";
 import type { Bar, Detail, Kind, Row, Strategy } from "./api";
+import {
+  WorkspaceProvider,
+  useWorkspace,
+  Loading,
+  RefreshNote,
+} from "./features/shared";
+import { OrderTicket, OrdersPage, OrderDetailPage } from "./features/orders";
+import { ResearchPage } from "./features/research";
+import { DeploymentPanel } from "./features/deployment";
+import {
+  OperationsPage,
+  ReportsPage,
+  WatchlistPage,
+} from "./features/monitoring";
 
 function ErrorBox({ error }: { error: Error }) {
   return (
     <div className="error-box" role="alert">
-      {error.message} <span>백엔드 실행 상태를 확인해 주세요.</span>
+      {error.message}{" "}
+      <span>운영 상태에서 연결·데이터 준비 상태를 확인해 주세요.</span>
     </div>
   );
 }
@@ -81,18 +104,47 @@ function PageTitle({
   );
 }
 function DataNote() {
+  const workspace = useWorkspace();
+  if (workspace.loading)
+    return (
+      <div className="data-note" role="status">
+        실행 모드와 계좌 연결을 확인하고 있습니다…
+      </div>
+    );
+  if (!workspace.data)
+    return (
+      <div className="warning-note" role="alert">
+        실행 환경을 확인하지 못했습니다. 주문 전송은 사용할 수 없습니다.
+      </div>
+    );
+  const data = workspace.data;
   return (
     <div className="data-note">
       <FlaskConical size={17} />
       <span>
-        <b>샘플 데이터로 살펴보는 연구실</b> · 가격은 생성된 예제이며 실제
-        시세가 아닙니다. 계좌는 초기 자금 1,000만 원의 로컬 모의계좌입니다.
+        <b>{data.mode === "kis_paper" ? "한투 모의계좌" : "로컬 시뮬레이션"}</b>{" "}
+        · {data.account_alias} ·{" "}
+        {data.mode === "local_simulation"
+          ? "생성된 예제 시세와 로컬 장부입니다. 실제 증권사 시세가 아닙니다."
+          : data.broker_connected
+            ? "모의 서버 연결 · 가격 시각과 계좌 대조 결과를 함께 확인하세요."
+            : "증권사 연결을 확인해야 합니다."}
+        {workspace.error && " · 연결 상태 갱신 실패"}
       </span>
     </div>
   );
 }
 
 export default function App() {
+  return (
+    <WorkspaceProvider>
+      <WorkspaceApp />
+    </WorkspaceProvider>
+  );
+}
+
+function WorkspaceApp() {
+  const workspace = useWorkspace();
   const client = useQueryClient();
   const screener = useQuery({ queryKey: ["screener"], queryFn: api.screener });
   const [selected, setSelected] = useState<string | null>(null);
@@ -126,16 +178,36 @@ export default function App() {
             <SlidersHorizontal size={19} />
             전략 관리
           </NavLink>
-          <NavLink to="/activity">
+          <NavLink to="/watchlist">
+            <ListFilter size={19} />
+            후보 감시
+          </NavLink>
+          <NavLink to="/orders">
             <Activity size={19} />
-            모의투자 기록
+            주문·체결
+          </NavLink>
+          <NavLink to="/research">
+            <FlaskConical size={19} />
+            연구실
+          </NavLink>
+          <NavLink to="/reports">
+            <BarChart3 size={19} />
+            성과 보고
+          </NavLink>
+          <NavLink to="/operations">
+            <CircleHelp size={19} />
+            운영 상태
           </NavLink>
         </nav>
         <div className="sidebar-card">
           <span className="tiny-label">현재 실행 환경</span>
           <strong>
             <i className="status-dot" />
-            LOCAL SIMULATION
+            {workspace.data?.mode === "kis_paper"
+              ? "KIS PAPER"
+              : workspace.data
+                ? "LOCAL SIMULATION"
+                : "확인 중"}
           </strong>
           <p>
             내 PC에서 전략을 검증하고
@@ -160,7 +232,7 @@ export default function App() {
           <div className="topbar-right">
             <span className="local-label">
               <i className="status-dot" />
-              로컬
+              {workspace.data?.mode === "kis_paper" ? "한투 모의" : "로컬"}
             </span>
             <button
               className="icon-button"
@@ -178,7 +250,18 @@ export default function App() {
             <Route path="/" element={<Dashboard onSelect={setSelected} />} />
             <Route path="/market" element={<Market onSelect={setSelected} />} />
             <Route path="/strategies" element={<Strategies />} />
-            <Route path="/activity" element={<ActivityPage />} />
+            <Route
+              path="/activity"
+              element={<Navigate to="/orders" replace />}
+            />
+            <Route path="/market/:symbol" element={<InstrumentPage />} />
+            <Route path="/watchlist" element={<WatchlistPage />} />
+            <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
+            <Route path="/research" element={<ResearchPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/operations" element={<OperationsPage />} />
+            <Route path="/settings" element={<OperationsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <footer className="page-footer">
@@ -197,18 +280,30 @@ export default function App() {
 }
 
 function Dashboard({ onSelect }: { onSelect: (symbol: string) => void }) {
-  const account = useQuery({ queryKey: ["portfolio"], queryFn: api.portfolio });
+  const workspace = useWorkspace();
+  const account = useQuery({
+    queryKey: ["portfolio"],
+    queryFn: api.portfolio,
+    refetchInterval: 15_000,
+  });
   const market = useQuery({ queryKey: ["screener"], queryFn: api.screener });
-  if (account.error) return <ErrorBox error={account.error} />;
-  if (market.error) return <ErrorBox error={market.error} />;
+  if (!account.data && account.isPending)
+    return (
+      <Loading>
+        계좌를 조회하고 있습니다. 금액과 보유 상태는 조회 후 표시합니다.
+      </Loading>
+    );
+  if (account.error && !account.data) return <ErrorBox error={account.error} />;
+  if (market.error && !market.data) return <ErrorBox error={market.error} />;
   const data = account.data;
   const rows = market.data?.rows ?? [];
   const ranking = [...rows]
     .sort((a, b) => (b.score ?? -1) - (a.score ?? -1))
     .slice(0, 5);
-  const cashShare = data
-    ? (Number(data.cash) / Number(data.equity)) * 100
-    : 100;
+  const cashShare =
+    data && Number(data.equity) > 0
+      ? (Number(data.cash) / Number(data.equity)) * 100
+      : 0;
   return (
     <>
       <PageTitle
@@ -221,6 +316,11 @@ function Dashboard({ onSelect }: { onSelect: (symbol: string) => void }) {
           <ArrowRight size={16} />
         </NavLink>
       </PageTitle>
+      <RefreshNote
+        fetching={account.isFetching}
+        error={account.error}
+        updatedAt={account.dataUpdatedAt}
+      />
       <div className="metrics">
         <Metric
           title="총 평가자산"
@@ -230,10 +330,10 @@ function Dashboard({ onSelect }: { onSelect: (symbol: string) => void }) {
           featured
         />
         <Metric
-          title="주문 가능 현금"
+          title="현금"
           value={data ? won(data.cash) : "—"}
           icon={<Coins size={19} />}
-          note={`자산의 ${cashShare.toFixed(1)}% · 로컬 모의계좌`}
+          note={`자산의 ${cashShare.toFixed(1)}% · ${workspace.data?.mode === "kis_paper" ? "한투 모의계좌" : "로컬 모의계좌"}`}
         />
         <Metric
           title="보유 종목 평가금액"
@@ -249,7 +349,7 @@ function Dashboard({ onSelect }: { onSelect: (symbol: string) => void }) {
               : "—"
           }
           icon={<Activity size={19} />}
-          note="보유 수량 기준 · 모의 매수 수수료 포함"
+          note="계좌 원천 기준 미실현 손익"
         />
       </div>
       <div className="dashboard-grid">
@@ -259,7 +359,9 @@ function Dashboard({ onSelect }: { onSelect: (symbol: string) => void }) {
               <h2>보유 포트폴리오</h2>
               <p>나의 자산 구성과 종목별 평가 현황</p>
             </div>
-            <span className="subtle-pill">로컬 모의</span>
+            <span className="subtle-pill">
+              {workspace.data?.mode === "kis_paper" ? "한투 모의" : "로컬 모의"}
+            </span>
           </div>
           {data?.positions.length ? (
             <div className="table-scroll">
@@ -308,7 +410,8 @@ function Dashboard({ onSelect }: { onSelect: (symbol: string) => void }) {
                 <Wallet size={29} />
                 <span>현금 비중</span>
                 <strong>
-                  100<span>%</span>
+                  {cashShare.toFixed(0)}
+                  <span>%</span>
                 </strong>
               </div>
               <div>
@@ -316,7 +419,7 @@ function Dashboard({ onSelect }: { onSelect: (symbol: string) => void }) {
                 <p>
                   종목을 탐색하고 근거를 확인한 다음
                   <br />
-                  로컬 모의매수를 기록하면 여기에 표시됩니다.
+                  체결 후 보유를 확인하면 여기에 표시됩니다.
                 </p>
                 <NavLink to="/market" className="inline-link">
                   종목 살펴보기 <ArrowRight size={15} />
@@ -338,7 +441,7 @@ function Dashboard({ onSelect }: { onSelect: (symbol: string) => void }) {
           <div className="panel-heading">
             <div>
               <h2>시그널 브리핑</h2>
-              <p>선택한 전략으로 분류한 샘플 종목</p>
+              <p>선택한 탐색 기준으로 분류한 수집 종목</p>
             </div>
             <Activity size={20} />
           </div>
@@ -378,7 +481,7 @@ function Dashboard({ onSelect }: { onSelect: (symbol: string) => void }) {
         <div className="panel-heading">
           <div>
             <h2>지금 살펴볼 종목</h2>
-            <p>매수 검토 점수 순 · 샘플 관심 종목 {rows.length}개 기준</p>
+            <p>매수 검토 점수 순 · 수집 종목 {rows.length}개 기준</p>
           </div>
           <NavLink className="inline-link" to="/market">
             전체 보기
@@ -425,14 +528,16 @@ function Market({ onSelect }: { onSelect: (symbol: string) => void }) {
   const [search, setSearch] = useState("");
   const [tag, setTag] = useState("all");
   const [sort, setSort] = useState("score");
-  if (query.error) return <ErrorBox error={query.error} />;
+  const [page, setPage] = useState(0);
+  useEffect(() => setPage(0), [kind, search, tag, sort]);
+  if (query.error && !query.data) return <ErrorBox error={query.error} />;
   const rows = (query.data?.rows ?? [])
     .filter(
       (r) =>
         (kind === "all" || r.kind === kind) &&
         (tag === "all" || r.tags.includes(tag)) &&
         (r.name.toLowerCase().includes(search.toLowerCase()) ||
-          r.symbol.includes(search)),
+          r.symbol.toUpperCase().includes(search.trim().toUpperCase())),
     )
     .sort((a, b) =>
       sort === "score"
@@ -441,6 +546,8 @@ function Market({ onSelect }: { onSelect: (symbol: string) => void }) {
           ? b.down_streak - a.down_streak
           : (b.returns["30"] ?? -Infinity) - (a.returns["30"] ?? -Infinity),
     );
+  const pageCount = Math.max(1, Math.ceil(rows.length / 50));
+  const currentPage = Math.min(page, pageCount - 1);
   return (
     <>
       <PageTitle
@@ -454,7 +561,7 @@ function Market({ onSelect }: { onSelect: (symbol: string) => void }) {
             {query.data?.rows.length ?? "—"}
             <small>종목</small>
           </strong>
-          <span>초기 관심 종목 목록</span>
+          <span>수집한 종목 목록</span>
         </div>
         <div>
           <strong>
@@ -471,7 +578,7 @@ function Market({ onSelect }: { onSelect: (symbol: string) => void }) {
         <div className="market-overview-note">
           <CircleHelp size={18} />
           <span>
-            전체 코스피 목록이 아닌 초기 관심 목록입니다.
+            자료의 수집 범위와 분석 기준일을 확인하세요.
             <br />
             과매도 상태가 반등을 보장하지는 않습니다.
           </span>
@@ -538,11 +645,39 @@ function Market({ onSelect }: { onSelect: (symbol: string) => void }) {
         {query.isPending ? (
           <div className="empty">종목을 분석하고 있습니다…</div>
         ) : (
-          <StockTable rows={rows} onSelect={onSelect} />
+          <StockTable
+            rows={rows.slice(currentPage * 50, (currentPage + 1) * 50)}
+            onSelect={onSelect}
+          />
         )}
+        <div className="page-controls market-pagination">
+          <span>
+            {currentPage + 1} / {pageCount}페이지 · 전체 {rows.length}종목
+          </span>
+          <button
+            className="button secondary"
+            disabled={currentPage === 0}
+            onClick={() => setPage(currentPage - 1)}
+          >
+            이전 종목
+          </button>
+          <button
+            className="button secondary"
+            disabled={currentPage + 1 >= pageCount}
+            onClick={() => setPage(currentPage + 1)}
+          >
+            다음 종목
+          </button>
+        </div>
+        <RefreshNote
+          fetching={query.isFetching}
+          error={query.error}
+          updatedAt={query.dataUpdatedAt}
+        />
         <div className="table-note">
-          분석 기준일 {query.data?.rows[0]?.as_of ?? "—"} · 수정주가 일봉을
-          연결할 수 있는 구조 · 현재는 생성된 예제 데이터
+          분석 기준일 {query.data?.rows[0]?.as_of ?? "미확인"} · 원천{" "}
+          {query.data?.source ?? "미확인"} · 현재가와 지표 기준일은 다를 수
+          있습니다.
         </div>
       </section>
     </>
@@ -589,7 +724,7 @@ function StockTable({
             </th>
             <th>종목</th>
             <th>
-              가격 <small>샘플</small>
+              가격 <small>조회 시세</small>
             </th>
             <th>7일</th>
             <th>30일</th>
@@ -605,6 +740,7 @@ function StockTable({
             )}
             <th>상태</th>
             <th>검토 점수</th>
+            {!compact && <th>운용 조건</th>}
             <th aria-label="상세 보기" />
           </tr>
         </thead>
@@ -666,6 +802,25 @@ function StockTable({
               <td>
                 <Score value={row.score} />
               </td>
+              {!compact && (
+                <td>
+                  {row.strategy_signal ? (
+                    <details>
+                      <summary>
+                        {row.strategy_signal.eligible
+                          ? "진입 조건 충족"
+                          : "진입 제외"}
+                      </summary>
+                      <small>운용 버전 {row.strategy_signal.version}</small>
+                      {row.strategy_signal.reasons.map((reason) => (
+                        <p key={reason}>{reasonLabels[reason] ?? reason}</p>
+                      ))}
+                    </details>
+                  ) : (
+                    "미분석"
+                  )}
+                </td>
+              )}
               <td>
                 <button
                   className="icon-button"
@@ -699,6 +854,7 @@ function Strategies() {
         title="전략 관리"
         description="가설을 설정으로 남기고, 변경할 때마다 새로운 버전으로 기록하세요."
       />
+      <DeploymentPanel />
       {savedVersion && (
         <p className="success" role="status">
           <Check size={16} />
@@ -707,7 +863,6 @@ function Strategies() {
       )}
       {query.data ? (
         <StrategyEditor
-          key={query.data.versions[0].version}
           strategy={query.data.versions[0]}
           versions={query.data.versions}
           onSaved={setSavedVersion}
@@ -719,7 +874,7 @@ function Strategies() {
   );
 }
 
-function StrategyEditor({
+export function StrategyEditor({
   strategy,
   versions,
   onSaved,
@@ -729,16 +884,47 @@ function StrategyEditor({
   onSaved: (version: number) => void;
 }) {
   const [draft, setDraft] = useState(strategy);
+  const [base, setBase] = useState(strategy);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(base);
+  useEffect(() => {
+    if (!dirty && strategy.version !== base.version) {
+      setDraft(strategy);
+      setBase(strategy);
+    }
+  }, [strategy, base.version, dirty]);
   const client = useQueryClient();
   const save = useMutation({
     mutationFn: api.saveStrategy,
     onSuccess: async (saved) => {
+      setDraft(saved);
+      setBase(saved);
       onSaved(saved.version);
       await client.invalidateQueries({ queryKey: ["screener"] });
       await client.invalidateQueries({ queryKey: ["instrument"] });
       await client.invalidateQueries({ queryKey: ["strategies"] });
     },
   });
+  const conflict =
+    strategy.version !== draft.version ||
+    (save.error instanceof ApiError && save.error.status === 409);
+  const reapply = () => {
+    const next = { ...strategy, weights: { ...strategy.weights } };
+    for (const key of [
+      "name",
+      "oversold_rsi",
+      "overbought_rsi",
+      "review_threshold",
+      "max_position_pct",
+    ] as const) {
+      if (draft[key] !== base[key]) Object.assign(next, { [key]: draft[key] });
+    }
+    for (const key of Object.keys(draft.weights))
+      if (draft.weights[key] !== base.weights[key])
+        next.weights[key] = draft.weights[key];
+    setBase(strategy);
+    setDraft(next);
+    save.reset();
+  };
   const total = Object.values(draft.weights).reduce((sum, n) => sum + n, 0);
   const descriptions: Record<string, [string, string]> = {
     oversold: ["RSI 과매도", "RSI가 설정한 과매도 기준에 가까울수록 높은 점수"],
@@ -840,6 +1026,60 @@ function StrategyEditor({
           초기 가중치는 검증 전 연구용 가설입니다. 점수 80은 상승 확률 80%를
           뜻하지 않습니다. 121거래일 미만 종목은 점수 산정에서 제외합니다.
         </p>
+        {conflict && (
+          <section className="warning-note" role="alert">
+            <h3>다른 변경이 저장되어 있습니다. 내 초안은 유지했습니다.</h3>
+            <p>
+              내 편집 기준 v{draft.version} · 서버 최신 v{strategy.version}
+            </p>
+            <dl className="conflict-values">
+              <div>
+                <dt>내 초안</dt>
+                <dd>
+                  {draft.name} · 가중치{" "}
+                  {Object.values(draft.weights).join(" / ")}
+                </dd>
+              </div>
+              <div>
+                <dt>최신 설정</dt>
+                <dd>
+                  {strategy.name} · 가중치{" "}
+                  {Object.values(strategy.weights).join(" / ")}
+                </dd>
+              </div>
+            </dl>
+            <div className="page-controls">
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() =>
+                  void client.invalidateQueries({ queryKey: ["strategies"] })
+                }
+              >
+                최신 설정 조회
+              </button>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => {
+                  setBase(strategy);
+                  setDraft(strategy);
+                  save.reset();
+                }}
+              >
+                최신값으로 교체
+              </button>
+              <button
+                className="button secondary"
+                type="button"
+                disabled={strategy.version === draft.version}
+                onClick={reapply}
+              >
+                내 변경을 최신값에 재적용
+              </button>
+            </div>
+          </section>
+        )}
         {save.error && (
           <div className="error-box" role="alert">
             {save.error.message}
@@ -849,7 +1089,7 @@ function StrategyEditor({
           <span>기존 버전은 그대로 보관됩니다.</span>
           <button
             className="button primary"
-            disabled={total !== 100 || save.isPending}
+            disabled={total !== 100 || save.isPending || conflict}
           >
             {save.isPending ? "저장 중…" : "새 버전으로 저장"}
             <ArrowRight size={16} />
@@ -869,8 +1109,8 @@ function StrategyEditor({
             표시합니다.
           </p>
           <p>
-            ETF의 추종지수, 환헤지, 괴리율 등은 별도의 분석 항목으로 확장할
-            예정입니다.
+            ETF의 추종지수, 환헤지, 괴리율은 연구실에서 원천 자료와 함께
+            확인합니다.
           </p>
         </section>
         <section className="panel versions">
@@ -894,63 +1134,22 @@ function StrategyEditor({
   );
 }
 
-function ActivityPage() {
-  const query = useQuery({ queryKey: ["portfolio"], queryFn: api.portfolio });
-  if (query.error) return <ErrorBox error={query.error} />;
+function InstrumentPage() {
+  const { symbol = "" } = useParams();
+  const query = useQuery({
+    queryKey: ["instrument", symbol],
+    queryFn: ({ signal }) => api.detail(symbol, signal),
+  });
   return (
-    <>
-      <PageTitle
-        eyebrow="PAPER ACTIVITY"
-        title="모의투자 기록"
-        description="로컬에서 기록한 매수와 현금 변화를 확인하세요. 증권사 주문은 전송되지 않습니다."
-      />
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>로컬 모의매수</h2>
-          <span className="subtle-pill">
-            {query.data?.orders.length ?? 0}건
-          </span>
-        </div>
-        {query.data?.orders.length ? (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>시각</th>
-                  <th>종목코드</th>
-                  <th>수량</th>
-                  <th>기록 가격</th>
-                  <th>모의 수수료</th>
-                  <th>데이터</th>
-                </tr>
-              </thead>
-              <tbody>
-                {query.data.orders.map((o) => (
-                  <tr key={o.request_id}>
-                    <td>{new Date(o.at).toLocaleString("ko-KR")}</td>
-                    <td>{o.symbol}</td>
-                    <td>{o.quantity}주</td>
-                    <td>{won(o.price)}원</td>
-                    <td>{won(o.fee)}원</td>
-                    <td>샘플</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty large">
-            <Activity size={32} />
-            <h3>아직 기록된 주문이 없습니다.</h3>
-            <p>종목 상세 화면에서 로컬 모의매수를 기록할 수 있습니다.</p>
-            <NavLink to="/market" className="button secondary">
-              종목 탐색으로 이동
-              <ArrowRight size={16} />
-            </NavLink>
-          </div>
-        )}
-      </section>
-    </>
+    <section className="panel padded-panel">
+      {query.isPending ? (
+        <Loading />
+      ) : query.error ? (
+        <ErrorBox error={query.error} />
+      ) : query.data ? (
+        <InstrumentBody detail={query.data} />
+      ) : null}
+    </section>
   );
 }
 
@@ -967,7 +1166,7 @@ function InstrumentDialog({
   }, []);
   const query = useQuery({
     queryKey: ["instrument", symbol],
-    queryFn: () => api.detail(symbol),
+    queryFn: ({ signal }) => api.detail(symbol, signal),
   });
   return (
     <dialog
@@ -996,16 +1195,6 @@ function InstrumentDialog({
 
 function InstrumentBody({ detail }: { detail: Detail }) {
   const analysis = detail.analysis;
-  const [quantity, setQuantity] = useState(1);
-  const [requestId, setRequestId] = useState(() => crypto.randomUUID());
-  const client = useQueryClient();
-  const buy = useMutation({
-    mutationFn: () => api.buy(detail.symbol, quantity, requestId),
-    onSuccess: async () => {
-      setRequestId(crypto.randomUUID());
-      await client.invalidateQueries({ queryKey: ["portfolio"] });
-    },
-  });
   return (
     <>
       <div className="detail-heading">
@@ -1024,7 +1213,9 @@ function InstrumentBody({ detail }: { detail: Detail }) {
           </span>
         </div>
         <span className="sample-label">
-          샘플 가격 · 분석 기준일 {analysis.as_of}
+          원천 {detail.quote.source} · 시세 관측{" "}
+          {new Date(detail.quote.observed_at).toLocaleString("ko-KR")} · 분석
+          기준일 {analysis.as_of}
         </span>
         <div className="badges">
           {analysis.tags.map((t) => (
@@ -1096,56 +1287,19 @@ function InstrumentBody({ detail }: { detail: Detail }) {
           </div>
         </section>
       </div>
-      <form
-        className="paper-order"
-        onSubmit={(e) => {
-          e.preventDefault();
-          buy.mutate();
-        }}
-      >
-        <div>
-          <h3>로컬 모의매수 기록</h3>
-          <p>
-            증권사 전송 없이 현재 샘플 가격으로 기록합니다. 수수료 가정 0.015%.
-          </p>
-        </div>
-        <label>
-          수량
-          <input
-            aria-label="모의매수 수량"
-            type="number"
-            min="1"
-            max="100000"
-            required
-            value={quantity}
-            onChange={(e) => {
-              buy.reset();
-              setQuantity(Number(e.target.value));
-              setRequestId(crypto.randomUUID());
-            }}
-          />
-        </label>
-        <button className="button primary" disabled={buy.isPending}>
-          {buy.isPending ? "기록 중…" : "모의매수 기록"}
-        </button>
-      </form>
-      {buy.error && (
-        <p className="error-box" role="alert">
-          {buy.error.message}
-        </p>
-      )}
-      {buy.isSuccess && (
-        <p className="success" role="status">
-          <Check size={16} />
-          로컬 모의계좌에 기록했습니다. 대시보드에서 확인할 수 있습니다.
-        </p>
-      )}
+      <OrderTicket
+        symbol={detail.symbol}
+        price={detail.quote.price}
+        strategyVersion={analysis.strategy_version}
+      />
     </>
   );
 }
 
 function PriceChart({ bars }: { bars: Bar[] }) {
   const shown = bars.slice(-130);
+  if (!shown.length)
+    return <div className="empty">표시할 일봉이 없습니다.</div>;
   const series = [
     { period: 0, color: "#5265df", label: "종가" },
     { period: 90, color: "#e9a04b", label: "90일선" },
@@ -1172,7 +1326,7 @@ function PriceChart({ bars }: { bars: Bar[] }) {
     <div className="price-chart">
       <div className="chart-heading">
         <span>
-          가격 흐름 <small>최근 130개 샘플 거래일</small>
+          가격 흐름 <small>최근 130개 관측 거래일</small>
         </span>
         <div>
           {series.map((s) => (
@@ -1186,7 +1340,7 @@ function PriceChart({ bars }: { bars: Bar[] }) {
       <svg
         viewBox="0 0 800 225"
         role="img"
-        aria-label="샘플 종가와 90일, 120일 이동평균선 차트"
+        aria-label="종가와 90일, 120일 이동평균선 차트"
       >
         {[0, 1, 2, 3].map((i) => (
           <g key={i}>
@@ -1198,7 +1352,7 @@ function PriceChart({ bars }: { bars: Bar[] }) {
               stroke="#e9edf3"
               strokeDasharray="4 4"
             />
-            <text x="735" y={39 + i * 50} fill="#9aa4b7" fontSize="11">
+            <text x="735" y={39 + i * 50} fill="#5a667a" fontSize="12">
               {won(max - (range * i) / 3)}
             </text>
           </g>
@@ -1227,13 +1381,38 @@ function PriceChart({ bars }: { bars: Bar[] }) {
             textAnchor={
               i === 0 ? "start" : i === shown.length - 1 ? "end" : "middle"
             }
-            fill="#9aa4b7"
-            fontSize="11"
+            fill="#5a667a"
+            fontSize="12"
           >
             {shown[i]?.session}
           </text>
         ))}
       </svg>
+      <details className="research-details">
+        <summary>차트 데이터 표 보기</summary>
+        <div className="table-scroll" tabIndex={0}>
+          <table>
+            <thead>
+              <tr>
+                <th>거래일</th>
+                <th>종가</th>
+                <th>90일선</th>
+                <th>120일선</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((bar, i) => (
+                <tr key={bar.session}>
+                  <td>{bar.session}</td>
+                  <td>{won(bar.close)}</td>
+                  <td>{won(values[1][i])}</td>
+                  <td>{won(values[2][i])}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }

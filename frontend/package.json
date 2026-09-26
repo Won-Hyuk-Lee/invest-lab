@@ -4,14 +4,21 @@
   "version": "0.1.0",
   "type": "module",
   "engines": {
-    "node": ">=22.12.0"
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "build": "tsc -b && vite build",
-    "format": "prettier --write src vite.config.ts tsconfig.json package.json index.html",
-    "format:check": "prettier --check src vite.config.ts tsconfig.json package.json index.html",
-    "preview": "vite preview --host 127.0.0.1"
+    "format": "prettier --write src tests e2e scripts *.ts tsconfig.json package.json index.html",
+    "format:check": "prettier --check src tests e2e scripts *.ts tsconfig.json package.json index.html",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:integration": "node e2e/integration-smoke.cjs",
+    "test:static": "node e2e/static-smoke.cjs",
+    "api:generate": "node scripts/api-contract.mjs",
+    "api:check": "node scripts/api-contract.mjs --check"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.0",
@@ -21,11 +28,20 @@
     "react-router-dom": "^7.9.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/node": "^26.6.3",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "jsdom": "^30.1.1",
+    "openapi-typescript": "^7.13.0",
     "prettier": "3.9.9",
     "typescript": "~5.9.2",
-    "vite": "^7.1.0"
+    "vite": "^7.1.0",
+    "vitest": "^5.0.2"
   }
 }

@@ -9,10 +9,10 @@
   background: #f5f6fa;
   font-synthesis: none;
   --accent: #5969db;
-  --muted: #8790a4;
+  --muted: #596478;
   --border: #e9ecf2;
-  --positive: #d45d62;
-  --negative: #4380cd;
+  --positive: #b43b46;
+  --negative: #2563a3;
 }
 * {
   box-sizing: border-box;
@@ -123,15 +123,16 @@ input {
 }
 .brand small {
   display: block;
-  font-size: 7px;
-  letter-spacing: 0.7px;
-  color: #969eb0;
+  font-size: 9px;
+  letter-spacing: 0.3px;
+  max-width: 140px;
+  color: #626975;
   margin-top: 4px;
 }
 .nav-caption {
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 1.7px;
-  color: #a1a9b9;
+  color: #636973;
   margin: 48px 15px 14px;
 }
 .sidebar nav {
@@ -145,7 +146,7 @@ input {
   padding: 13px 14px;
   border-radius: 9px;
   font-size: 13px;
-  color: #7b849a;
+  color: #606879;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -154,11 +155,11 @@ input {
 }
 .sidebar nav a.active {
   background: #eef0fc;
-  color: #5262d2;
+  color: #4c5cc4;
 }
 .nav-count {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
   padding: 2px 6px;
   border-radius: 5px;
   background: #e3e7fb;
@@ -171,14 +172,14 @@ input {
   background: linear-gradient(135deg, #fafbff, #f6f8fc);
 }
 .tiny-label {
-  font-size: 11px;
-  color: #949cb0;
+  font-size: 12px;
+  color: #616775;
 }
 .sidebar-card strong {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.8px;
   margin: 9px 0 12px;
 }
@@ -192,7 +193,7 @@ input {
 }
 .sidebar-card p {
   font-size: 12px;
-  color: #8790a4;
+  color: #5f6575;
   line-height: 1.9;
 }
 .version-label {
@@ -200,8 +201,8 @@ input {
   border-top: 1px solid #e8ebf3;
   margin-top: 14px;
   padding-top: 12px;
-  font-size: 11px;
-  color: #8790a4;
+  font-size: 12px;
+  color: #5f6575;
 }
 .sidebar-bottom {
   margin-top: 26px;
@@ -212,10 +213,10 @@ input {
   font-weight: 600;
 }
 .sidebar-bottom small {
-  font-size: 11px;
+  font-size: 12px;
   display: block;
   font-weight: 400;
-  color: #929bae;
+  color: #606674;
   margin-top: 4px;
 }
 .avatar {
@@ -223,10 +224,10 @@ input {
   height: 34px;
   border-radius: 50%;
   background: #f1f2f8;
-  color: #7c86a1;
+  color: #5e657b;
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: 12px;
 }
 .workspace {
   margin-left: 232px;
@@ -246,10 +247,10 @@ input {
   align-items: center;
   gap: 14px;
   font-size: 12px;
-  color: #a0a7b7;
+  color: #626772;
 }
 .breadcrumb span {
-  color: #6e7990;
+  color: #5c6579;
 }
 .topbar-right {
   display: flex;
@@ -257,8 +258,8 @@ input {
   gap: 25px;
 }
 .local-label {
-  font-size: 11px;
-  color: #738678;
+  font-size: 12px;
+  color: #5a695e;
   display: flex;
   gap: 8px;
   align-items: center;
@@ -268,13 +269,13 @@ input {
   align-items: center;
   justify-content: center;
   background: transparent;
-  color: #98a0b2;
+  color: #616673;
   padding: 7px;
   border-radius: 6px;
 }
 .icon-button:hover {
   background: #edf0f8;
-  color: #5565d1;
+  color: #4f5ec3;
 }
 main {
   padding: 25px 40px 0;
@@ -283,9 +284,9 @@ main {
 }
 .data-note {
   background: #fdf9f0;
-  color: #a7884e;
+  color: #7b6338;
   border: 1px solid #f1e6cf;
-  font-size: 11px;
+  font-size: 12px;
   padding: 11px 14px;
   display: flex;
   align-items: center;
@@ -306,9 +307,9 @@ main {
   gap: 20px;
 }
 .eyebrow {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 2px;
-  color: #97a0b4;
+  color: #606674;
   font-weight: 600;
   margin-bottom: 10px;
 }
@@ -319,7 +320,7 @@ h1 {
 }
 .page-heading p {
   font-size: 12px;
-  color: #748097;
+  color: #5e687b;
   margin-top: 9px;
 }
 .button {
@@ -344,7 +345,7 @@ h1 {
 }
 .button.secondary {
   background: #f0f2fb;
-  color: #5868d2;
+  color: #4f5ebe;
 }
 .metrics {
   display: grid;
@@ -364,10 +365,10 @@ h1 {
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
-  color: #8992a7;
+  color: #616777;
 }
 .metric > div svg {
-  color: #a1acc1;
+  color: #606775;
 }
 .metric > strong {
   display: block;
@@ -381,12 +382,12 @@ h1 {
 .metric > strong small {
   font-size: 12px;
   font-weight: 400;
-  color: #9299ad;
+  color: #606573;
   margin-left: 6px;
 }
 .metric p {
-  font-size: 10px;
-  color: #707d94;
+  font-size: 12px;
+  color: #5e697d;
   margin-top: 8px;
 }
 .metric.featured {
@@ -397,7 +398,7 @@ h1 {
   color: #4b5dd0;
 }
 .metric.featured > div svg {
-  color: #7483de;
+  color: #5863aa;
 }
 .dashboard-grid {
   display: grid;
@@ -419,19 +420,19 @@ h1 {
   gap: 15px;
 }
 .panel-heading p {
-  font-size: 11px;
-  color: #748097;
+  font-size: 12px;
+  color: #5e687b;
   margin-top: 6px;
 }
 .panel-heading > svg {
-  color: #8492bc;
+  color: #5e6786;
 }
 .subtle-pill {
-  font-size: 10px;
+  font-size: 12px;
   padding: 5px 9px;
   border-radius: 5px;
   background: #f3f5fa;
-  color: #919bae;
+  color: #5f6674;
   white-space: nowrap;
 }
 .portfolio-empty {
@@ -458,13 +459,13 @@ h1 {
   display: none;
 }
 .cash-ring > span {
-  font-size: 10px;
-  color: #9aa3b5;
+  font-size: 12px;
+  color: #616975;
 }
 .cash-ring strong {
   font-size: 30px;
   font-weight: 500;
-  color: #5364cc;
+  color: #4d5ebf;
   margin-top: 5px;
   line-height: 1.2;
 }
@@ -476,14 +477,14 @@ h1 {
   font-size: 12px;
 }
 .portfolio-empty p {
-  font-size: 11px;
-  color: #707d94;
+  font-size: 12px;
+  color: #5e697d;
   margin: 10px 0 15px;
 }
 .inline-link {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
-  color: #6e7cd4;
+  color: #5661a8;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -494,8 +495,8 @@ h1 {
   display: flex;
   gap: 25px;
   justify-content: center;
-  font-size: 11px;
-  color: #8992a6;
+  font-size: 12px;
+  color: #616777;
 }
 .legend-dot {
   display: inline-block;
@@ -522,8 +523,8 @@ h1 {
 }
 .signal-counts span {
   display: block;
-  font-size: 11px;
-  color: #a0a8b8;
+  font-size: 12px;
+  color: #626873;
   margin-bottom: 9px;
 }
 .signal-counts strong {
@@ -531,8 +532,8 @@ h1 {
   font-weight: 500;
 }
 .signal-counts small {
-  font-size: 10px;
-  color: #707d94;
+  font-size: 12px;
+  color: #5e697d;
   font-weight: 400;
   margin-left: 7px;
 }
@@ -550,13 +551,13 @@ h1 {
   display: grid;
   place-items: center;
   background: #f0f2fc;
-  color: #7988d4;
+  color: #58639d;
   border-radius: 9px;
 }
 .active-strategy small {
   display: block;
-  color: #a2aabc;
-  font-size: 10px;
+  color: #616571;
+  font-size: 12px;
 }
 .active-strategy strong {
   display: block;
@@ -565,8 +566,8 @@ h1 {
   margin: 5px 0;
 }
 .active-strategy span {
-  font-size: 10px;
-  color: #a3abbc;
+  font-size: 12px;
+  color: #616671;
 }
 .research-summary > .inline-link {
   margin: 0 23px 19px;
@@ -582,17 +583,17 @@ table {
   font-size: 12px;
 }
 th {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 450;
-  color: #8f99af;
+  color: #5e6575;
   background: #fafbfe;
   padding: 13px 15px;
   border-top: 1px solid #eef0f6;
   border-bottom: 1px solid #eef0f6;
 }
 th small {
-  font-size: 10px;
-  color: #afb6c5;
+  font-size: 12px;
+  color: #61656f;
 }
 td {
   padding: 17px 15px;
@@ -607,8 +608,8 @@ tbody tr:hover {
 }
 td small {
   display: block;
-  font-size: 10px;
-  color: #a4adbd;
+  font-size: 12px;
+  color: #616772;
   margin-top: 5px;
 }
 td small span {
@@ -618,15 +619,15 @@ td small span {
   width: 35px;
   padding-left: 20px;
   padding-right: 0;
-  color: #b7bfce;
+  color: #626771;
 }
 .star-button {
   padding: 4px 0;
   background: none;
-  color: #c4cbd8;
+  color: #63676e;
 }
 .star-button.on {
-  color: #dbad51;
+  color: #80632c;
 }
 .star-button.on svg {
   fill: #f8eac6;
@@ -652,7 +653,7 @@ td small span {
 }
 .price-cell small {
   display: inline;
-  font-size: 10px;
+  font-size: 12px;
   margin-left: 3px;
 }
 .positive {
@@ -662,7 +663,7 @@ td small span {
   color: var(--negative);
 }
 .neutral {
-  color: #9ba4b6;
+  color: #626975;
 }
 .badges {
   display: flex;
@@ -670,32 +671,32 @@ td small span {
   flex-wrap: wrap;
 }
 .badge {
-  font-size: 10px;
+  font-size: 12px;
   padding: 4px 7px;
   border-radius: 4px;
   background: #f0f2f7;
-  color: #8b95ab;
+  color: #5e6576;
   white-space: nowrap;
 }
 .badge.oversold {
-  color: #9274b7;
+  color: #735b91;
   background: #f3eef9;
 }
 .badge.overbought {
-  color: #ca8582;
+  color: #8c5b59;
   background: #fff0ee;
 }
 .badge.uptrend {
-  color: #669c8a;
+  color: #476f61;
   background: #edf7f1;
 }
 .badge.downtrend,
 .badge.declining {
-  color: #748fb9;
+  color: #556988;
   background: #eef3fc;
 }
 .badge.rebound {
-  color: #b69550;
+  color: #7d6535;
   background: #faf4e6;
 }
 .score {
@@ -719,7 +720,7 @@ td small span {
 }
 .score b {
   font-size: 12px;
-  color: #6e7bc7;
+  color: #5963a3;
   font-weight: 600;
 }
 .page-footer {
@@ -727,12 +728,12 @@ td small span {
   justify-content: space-between;
   gap: 20px;
   padding: 28px 0 25px;
-  color: #aab2c3;
-  font-size: 10px;
+  color: #616772;
+  font-size: 12px;
 }
 .page-footer > span:first-child {
   letter-spacing: 1px;
-  font-size: 10px;
+  font-size: 12px;
 }
 .market-overview {
   display: flex;
@@ -745,16 +746,16 @@ td small span {
   display: block;
   font-size: 23px;
   font-weight: 500;
-  color: #5d6a83;
+  color: #5a667f;
 }
 .market-overview > div > strong small {
-  font-size: 11px;
-  color: #9ca6ba;
+  font-size: 12px;
+  color: #606774;
   margin-left: 7px;
 }
 .market-overview > div > span {
-  font-size: 11px;
-  color: #a2aabe;
+  font-size: 12px;
+  color: #616573;
   display: block;
   margin-top: 6px;
 }
@@ -763,7 +764,7 @@ td small span {
   display: flex;
   gap: 10px;
   align-items: center;
-  color: #a2aabe;
+  color: #616573;
 }
 .market-overview-note span {
   line-height: 1.8;
@@ -785,15 +786,15 @@ td small span {
 }
 .segment button {
   background: none;
-  color: #99a2b5;
+  color: #616875;
   padding: 7px 12px;
   border-radius: 5px;
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 .segment button.selected {
   background: white;
-  color: #6778d2;
+  color: #5461ac;
   box-shadow: 0 1px 5px #34416012;
   font-weight: 500;
 }
@@ -804,24 +805,24 @@ td small span {
   border: 1px solid var(--border);
   padding: 9px 12px;
   border-radius: 6px;
-  color: #a5aec0;
+  color: #626874;
 }
 .search-box input {
   border: 0;
   outline: 0;
   width: 165px;
-  font-size: 11px;
+  font-size: 12px;
   background: none;
 }
 .search-box input::placeholder {
-  color: #abb3c1;
+  color: #626771;
 }
 .filter-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 22px 18px;
-  color: #a4aec0;
+  color: #616874;
 }
 .filter-row > div {
   display: flex;
@@ -829,14 +830,14 @@ td small span {
   align-items: center;
 }
 .filter-row select {
-  font-size: 11px;
+  font-size: 12px;
   border: 0;
   background: white;
   padding: 5px;
-  color: #8791a8;
+  color: #5f6678;
 }
 .result-count {
-  font-size: 11px;
+  font-size: 12px;
   border-left: 1px solid #e4e8f2;
   padding-left: 12px;
   margin-left: 5px;
@@ -844,13 +845,13 @@ td small span {
 .table-note {
   padding: 16px 23px;
   border-top: 1px solid #eef0f5;
-  color: #a6aec0;
-  font-size: 10px;
+  color: #636874;
+  font-size: 12px;
 }
 .empty {
   text-align: center;
   padding: 65px 25px;
-  color: #9aa4b7;
+  color: #616976;
   font-size: 12px;
 }
 .empty.large {
@@ -861,7 +862,7 @@ td small span {
   gap: 17px;
 }
 .empty h3 {
-  color: #79869d;
+  color: #5e697c;
   font-size: 15px;
 }
 .empty .button {
@@ -870,14 +871,14 @@ td small span {
 .error-box {
   padding: 15px 18px;
   background: #fff1ef;
-  color: #b76162;
+  color: #9b5253;
   border: 1px solid #f2d7d4;
   border-radius: 8px;
   font-size: 12px;
   margin: 15px 0;
 }
 .error-box span {
-  font-size: 11px;
+  font-size: 12px;
   display: block;
   margin-top: 6px;
 }
@@ -897,7 +898,7 @@ td small span {
   flex-direction: column;
   gap: 10px;
   font-size: 12px;
-  color: #818ba1;
+  color: #5e6577;
 }
 .field input {
   border: 1px solid #e4e8f1;
@@ -914,13 +915,13 @@ td small span {
   margin: 28px 0 4px;
 }
 .weight-heading span {
-  font-size: 11px;
+  font-size: 12px;
 }
 .valid {
-  color: #5d9b89;
+  color: #406e61;
 }
 .invalid {
-  color: #c46969;
+  color: #9c5252;
 }
 .weight-row {
   display: grid;
@@ -936,13 +937,13 @@ td small span {
 }
 .weight-row small {
   display: block;
-  font-size: 10px;
-  color: #707d94;
+  font-size: 12px;
+  color: #5e697d;
   margin-top: 6px;
 }
 .weight-row > span {
   font-size: 16px;
-  color: #6f7ccd;
+  color: #5761a2;
   text-align: right;
 }
 .weight-row > span small {
@@ -961,8 +962,8 @@ td small span {
   margin: 25px 0;
 }
 .form-note {
-  font-size: 11px;
-  color: #707d94;
+  font-size: 12px;
+  color: #5e697d;
   line-height: 1.8;
   margin: 15px 0;
 }
@@ -975,8 +976,8 @@ td small span {
   gap: 10px;
 }
 .form-actions > span {
-  font-size: 11px;
-  color: #a0a9bc;
+  font-size: 12px;
+  color: #626975;
 }
 .methodology {
   padding-bottom: 13px;
@@ -984,7 +985,7 @@ td small span {
 }
 .methodology p {
   font-size: 12px;
-  color: #929db1;
+  color: #606876;
   padding: 0 23px;
   margin-bottom: 15px;
   line-height: 1.9;
@@ -994,13 +995,13 @@ td small span {
   padding: 16px 12px;
   border-radius: 7px;
   background: #f4f6fd;
-  color: #7c88c1;
+  color: #5b638f;
   font-size: 12px;
   text-align: center;
 }
 .versions > .panel-heading > span {
-  font-size: 11px;
-  color: #9aa4b7;
+  font-size: 12px;
+  color: #616976;
 }
 .version-row {
   margin: 0 22px;
@@ -1017,7 +1018,7 @@ td small span {
   place-items: center;
   border-radius: 8px;
   background: #f0f2fc;
-  color: #818fce;
+  color: #5b6594;
   font-size: 12px;
 }
 .version-row strong {
@@ -1026,15 +1027,15 @@ td small span {
 }
 .version-row small {
   display: block;
-  font-size: 10px;
-  color: #a5adbd;
+  font-size: 12px;
+  color: #626772;
   margin-top: 5px;
 }
 .version-row .subtle-pill {
   margin-left: auto;
 }
 .success {
-  color: #539682;
+  color: #3d7262;
   font-size: 12px;
   display: flex;
   gap: 7px;
@@ -1066,7 +1067,7 @@ td small span {
 .detail-heading h2 small {
   font-size: 12px;
   font-weight: 400;
-  color: #9ba5b8;
+  color: #5f6673;
   margin-left: 12px;
   letter-spacing: 0;
 }
@@ -1077,7 +1078,7 @@ td small span {
 }
 .detail-price > small {
   font-size: 13px;
-  color: #9ca5b8;
+  color: #606673;
   margin: 0 15px 0 5px;
 }
 .detail-price > span {
@@ -1085,8 +1086,8 @@ td small span {
   font-weight: 400;
 }
 .sample-label {
-  font-size: 11px;
-  color: #a3acc0;
+  font-size: 12px;
+  color: #616774;
 }
 .detail-heading .badges {
   margin-top: 14px;
@@ -1106,18 +1107,18 @@ td small span {
   align-items: center;
   justify-content: space-between;
   font-size: 12px;
-  color: #66738e;
+  color: #5c6780;
 }
 .chart-heading small {
-  font-size: 10px;
-  color: #acb4c6;
+  font-size: 12px;
+  color: #636874;
   margin-left: 9px;
 }
 .chart-heading > div {
   display: flex;
   gap: 13px;
-  font-size: 10px;
-  color: #98a4b9;
+  font-size: 12px;
+  color: #616977;
 }
 .chart-heading i {
   display: inline-block;
@@ -1140,8 +1141,8 @@ td small span {
   border: 0;
 }
 .detail-metrics span {
-  font-size: 11px;
-  color: #98a3b7;
+  font-size: 12px;
+  color: #616976;
 }
 .detail-metrics strong {
   display: block;
@@ -1172,11 +1173,11 @@ td small span {
 }
 .section-line > strong {
   font-size: 22px;
-  color: #7382d5;
+  color: #5762a3;
 }
 .section-line > strong small {
   font-size: 12px;
-  color: #abb4c7;
+  color: #626875;
   font-weight: 400;
 }
 .component-row {
@@ -1184,21 +1185,21 @@ td small span {
   align-items: center;
   gap: 13px;
   margin: 16px 0;
-  font-size: 11px;
+  font-size: 12px;
 }
 .component-row > div:first-child {
   width: 111px;
   flex: none;
 }
 .component-row small {
-  font-size: 10px;
-  color: #a3adc0;
+  font-size: 12px;
+  color: #616774;
   display: block;
   margin-top: 4px;
 }
 .component-row > b {
   font-size: 12px;
-  color: #8290c9;
+  color: #5c6590;
   min-width: 33px;
   text-align: right;
 }
@@ -1225,17 +1226,17 @@ td small span {
   gap: 8px;
   border-bottom: 1px solid #f0f2f7;
   padding: 13px 0;
-  font-size: 11px;
-  color: #96a1b6;
+  font-size: 12px;
+  color: #5f6775;
 }
 .detail-technical strong {
   font-size: 12px;
   font-weight: 500;
-  color: #6e7b94;
+  color: #5c677d;
 }
 .detail-technical small {
   margin-left: 5px;
-  font-size: 10px;
+  font-size: 12px;
 }
 .paper-order {
   background: #f6f7fc;
@@ -1253,13 +1254,13 @@ td small span {
   font-size: 12px;
 }
 .paper-order p {
-  font-size: 10px;
-  color: #707d94;
+  font-size: 12px;
+  color: #5e697d;
   margin-top: 7px;
 }
 .paper-order label {
-  font-size: 10px;
-  color: #929db3;
+  font-size: 12px;
+  color: #606877;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -1317,7 +1318,7 @@ td small span {
     font-size: 22px;
   }
   .metric p {
-    font-size: 10px;
+    font-size: 12px;
   }
   .dashboard-grid {
     gap: 17px;
@@ -1373,7 +1374,7 @@ td small span {
     width: 100%;
   }
   .page-heading .button {
-    font-size: 11px;
+    font-size: 12px;
   }
   .page-footer {
     flex-direction: column;
@@ -1416,7 +1417,7 @@ td small span {
   .sidebar nav a {
     padding: 9px 7px;
     gap: 6px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .sidebar nav a svg {
     width: 15px;
@@ -1433,7 +1434,7 @@ td small span {
     padding: 0 20px;
   }
   .breadcrumb {
-    font-size: 10px;
+    font-size: 12px;
     gap: 9px;
   }
   .topbar-right {
@@ -1443,7 +1444,7 @@ td small span {
     padding: 18px 16px 0;
   }
   .data-note {
-    font-size: 10px;
+    font-size: 12px;
     line-height: 1.8;
     align-items: flex-start;
     padding: 10px;
@@ -1459,7 +1460,7 @@ td small span {
     align-items: flex-start;
   }
   .page-heading p {
-    font-size: 11px;
+    font-size: 12px;
     max-width: 250px;
   }
   h1 {
@@ -1467,7 +1468,7 @@ td small span {
   }
   .page-heading > .button {
     padding: 10px;
-    font-size: 10px;
+    font-size: 12px;
     gap: 6px;
     margin-top: 15px;
   }
@@ -1483,13 +1484,13 @@ td small span {
     margin-top: 14px;
   }
   .metric > div {
-    font-size: 11px;
+    font-size: 12px;
   }
   .metric > div svg {
     width: 16px;
   }
   .metric p {
-    font-size: 10px;
+    font-size: 12px;
   }
   .panel-heading {
     padding: 20px 18px 15px;
@@ -1508,10 +1509,10 @@ td small span {
     height: 140px;
   }
   .portfolio-empty p {
-    font-size: 11px;
+    font-size: 12px;
   }
   .panel-foot {
-    font-size: 10px;
+    font-size: 12px;
   }
   .market-overview {
     gap: 18px;
@@ -1521,12 +1522,12 @@ td small span {
     font-size: 16px;
   }
   .market-overview > div > strong small {
-    font-size: 10px;
+    font-size: 12px;
     display: block;
     margin: 4px 0;
   }
   .market-overview > div > span {
-    font-size: 10px;
+    font-size: 12px;
   }
   .market-toolbar {
     padding: 16px;
@@ -1536,17 +1537,17 @@ td small span {
     justify-content: space-between;
   }
   .segment button {
-    font-size: 10px;
+    font-size: 12px;
     padding: 8px;
   }
   .filter-row {
     padding: 0 16px 14px;
   }
   .filter-row select {
-    font-size: 10px;
+    font-size: 12px;
   }
   .table-note {
-    font-size: 10px;
+    font-size: 12px;
     padding: 13px 16px;
     line-height: 1.8;
   }
@@ -1564,24 +1565,24 @@ td small span {
     font-size: 12px;
   }
   .weight-row small {
-    font-size: 10px;
+    font-size: 12px;
   }
   .settings-grid {
     gap: 15px;
   }
   .field {
-    font-size: 11px;
+    font-size: 12px;
   }
   .form-actions {
     align-items: flex-end;
   }
   .form-actions > span {
-    font-size: 10px;
+    font-size: 12px;
     max-width: 105px;
     line-height: 1.6;
   }
   .form-actions .button {
-    font-size: 11px;
+    font-size: 12px;
   }
   .instrument-dialog {
     padding: 24px 18px;
@@ -1600,7 +1601,7 @@ td small span {
     padding: 5px 7px;
   }
   .detail-metrics span {
-    font-size: 10px;
+    font-size: 12px;
   }
   .detail-metrics strong span {
     font-size: 13px;
@@ -1616,13 +1617,13 @@ td small span {
     flex-basis: 100%;
   }
   .paper-order p {
-    font-size: 10px;
+    font-size: 12px;
   }
   .paper-order .button {
     margin-left: auto;
   }
   .chart-heading {
-    font-size: 11px;
+    font-size: 12px;
   }
   .chart-heading small {
     display: none;
@@ -1632,9 +1633,365 @@ td small span {
   }
   .chart-heading > div {
     gap: 8px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .page-footer {
-    font-size: 10px;
+    font-size: 12px;
   }
+}
+/* Shared operating and research surfaces. */
+.sidebar {
+  overflow-y: auto;
+}
+.padded-panel {
+  padding: 24px;
+  margin-bottom: 20px;
+  min-width: 0;
+}
+.padded-panel > h2 {
+  margin: 20px 0 16px;
+}
+.padded-panel > h2:first-child {
+  margin-top: 0;
+}
+.table-scroll {
+  max-width: 100%;
+}
+.table-scroll:focus-visible {
+  outline: 3px solid #5969db;
+  outline-offset: 2px;
+}
+.search-box input:focus-visible {
+  outline: 3px solid #5969db;
+  outline-offset: 3px;
+}
+fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.field select,
+.field textarea {
+  border: 1px solid #b7c0d2;
+  border-radius: 6px;
+  background: white;
+  padding: 10px;
+  width: 100%;
+  font: inherit;
+  color: #344057;
+}
+.field textarea {
+  resize: vertical;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}
+.field input[type="file"] {
+  max-width: 100%;
+}
+.page-controls {
+  display: flex;
+  align-items: end;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.page-controls .field {
+  flex: 1 1 160px;
+  margin: 0;
+}
+.freshness-note {
+  color: #536178;
+  font-size: 12px;
+  margin: 12px 0;
+}
+.warning-note {
+  border: 1px solid #dbbd79;
+  background: #fff9eb;
+  color: #735110;
+  padding: 16px;
+  border-radius: 8px;
+  margin: 14px 0;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.warning-note button,
+.warning-note a {
+  margin: 10px 10px 0 0;
+}
+.warning-note a,
+.padded-panel a {
+  color: #334aaa;
+  text-decoration: underline;
+}
+.readiness-list {
+  list-style: none;
+  margin: 16px 0;
+  padding: 0;
+}
+.readiness-list li {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e9ecf2;
+}
+.readiness-list p {
+  color: #536178;
+  font-size: 12px;
+  margin-top: 5px;
+}
+.status-pill {
+  display: inline-block;
+  white-space: nowrap;
+  padding: 4px 7px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+.status-pill.ready {
+  background: #e8f5ed;
+  color: #21603c;
+}
+.status-pill.waiting {
+  background: #fff1ce;
+  color: #735110;
+}
+.order-ticket {
+  margin: 24px 0;
+  padding: 20px;
+  background: #f6f7fc;
+  border: 1px solid #d9dfed;
+  border-radius: 10px;
+}
+.order-ticket .inline-link,
+.order-ticket > .button {
+  margin: 14px 14px 0 0;
+}
+.ticket-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+  margin: 18px 0;
+}
+.ticket-fields .field {
+  margin: 0;
+}
+.order-summary {
+  padding: 16px 0;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.order-summary small {
+  color: #56637a;
+}
+.event-list {
+  padding-left: 22px;
+}
+.event-list li {
+  padding: 12px 0;
+  line-height: 1.8;
+}
+.event-list time {
+  color: #536178;
+  display: block;
+  font-size: 12px;
+}
+.research-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 22px 0;
+}
+.research-tabs button {
+  padding: 11px 16px;
+  border-radius: 7px;
+  background: #e8ecf5;
+  color: #455269;
+}
+.research-tabs button[aria-selected="true"] {
+  background: #4659c2;
+  color: white;
+}
+.research-details {
+  margin: 18px 0;
+  padding: 12px 0;
+  border-top: 1px solid #dfe4ef;
+}
+.research-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #334aaa;
+  padding: 8px 0;
+}
+.research-result {
+  margin-top: 24px;
+  border-top: 2px solid #d9dfed;
+}
+.record-details {
+  margin: 14px 0;
+}
+.record-details > div {
+  display: grid;
+  grid-template-columns: minmax(100px, 160px) minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e9ecf2;
+}
+.record-details dt {
+  color: #56637a;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.record-details dd {
+  margin: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.record-details pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  max-height: 440px;
+  overflow: auto;
+}
+.experiment-form {
+  padding: 18px 0;
+  border-bottom: 1px solid #e9ecf2;
+  margin-bottom: 20px;
+}
+.experiment-form .settings-grid {
+  margin-bottom: 18px;
+}
+.conflict-values {
+  font-size: 12px;
+}
+.conflict-values dd {
+  margin: 4px 0 14px;
+}
+.table-note {
+  font-size: 12px;
+  color: #556279;
+}
+.form-note,
+.sample-label,
+.page-footer,
+.metric p,
+.panel-heading p,
+.price-cell small,
+.stock-table td small,
+.detail-metrics span,
+.detail-technical > div,
+.component-row small,
+.version-row small {
+  color: #56637a;
+}
+.form-note {
+  line-height: 1.8;
+}
+.error-box small {
+  display: block;
+}
+.filter-row {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+@media (max-width: 700px) {
+  .sidebar nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .sidebar nav a {
+    white-space: normal;
+    min-width: 0;
+    font-size: 12px;
+    padding: 10px;
+  }
+  .padded-panel {
+    padding: 18px 14px;
+  }
+  .record-details > div {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+  .ticket-fields {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .order-ticket {
+    padding: 14px;
+  }
+  .research-tabs {
+    gap: 5px;
+  }
+  .research-tabs button {
+    font-size: 12px;
+    padding: 10px;
+  }
+  .table-note,
+  .sample-label,
+  .form-note {
+    font-size: 12px;
+  }
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .market-overview {
+    flex-wrap: wrap;
+  }
+  .page-heading {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .filter-row > div {
+    flex-wrap: wrap;
+  }
+  .segment {
+    flex-wrap: wrap;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+.equity-curve svg {
+  width: 100%;
+  display: block;
+  margin-top: 20px;
+}
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin: 12px 0;
+}
+.checkbox-field input {
+  width: 17px;
+  height: 17px;
+}
+.research-result > section > h3,
+.research-result > h3 {
+  margin: 22px 0 12px;
+}
+.market-pagination {
+  padding: 0 22px;
+  font-size: 12px;
+}
+.market-panel > .freshness-note {
+  padding: 0 22px;
+}
+.stock-table td details {
+  max-width: 210px;
+  white-space: normal;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.stock-table td details summary {
+  cursor: pointer;
+  color: #35456e;
 }
