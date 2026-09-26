@@ -167,14 +167,14 @@ def test_xml_disallows_entity_payload_and_zip_stays_in_memory():
 
 
 def test_xbrl_extracts_receipt_context_and_rejects_segment_values():
-    content = b"""<xbrl xmlns="http://www.xbrl.org/2003/instance" 
+    content = b"""<xbrl xmlns="http://www.xbrl.org/2003/instance"
     xmlns:ifrs="urn:ifrs" xmlns:d="urn:dim">
     <context id="total"><entity><identifier scheme="x">A</identifier></entity>
     <period><startDate>2023-01-01</startDate>
     <endDate>2023-03-31</endDate></period></context>
     <context id="segment"><entity><segment>
     <d:explicitMember dimension="BusinessSegmentsAxis">part</d:explicitMember></segment></entity>
-    
+
     <period><startDate>2023-01-01</startDate>
     <endDate>2023-03-31</endDate></period></context>
     <unit id="KRW"><measure>iso4217:KRW</measure></unit>

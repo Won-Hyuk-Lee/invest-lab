@@ -1,0 +1,79 @@
+name: Verify
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Install Python dependencies from the lockfile
+        run: uv sync --project backend --frozen
+      - name: Python style and import boundaries
+        run: |
+          uv run --project backend --frozen ruff check backend/src backend/tests scripts/export-openapi.py
+          uv run --project backend --frozen ruff format --check backend/src backend/tests scripts/export-openapi.py
+          uv run --project backend --frozen pytest backend/tests/test_architecture.py
+      - name: Backend and isolated paper lifecycle tests
+        run: uv run --project backend --frozen pytest backend/tests
+      - name: Export API without credentials or user data
+        run: uv run --project backend --frozen python scripts/export-openapi.py .local/openapi.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: API contract, frontend checks and production build
+        working-directory: frontend
+        env:
+          INVEST_OPENAPI_PATH: ../.local/openapi.json
+        run: |
+          npm run api:check
+          npm run format:check
+          npm test
+          npm run build
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Browser regressions against isolated fixtures
+        working-directory: frontend
+        run: npm run test:e2e
+      - name: Compiled application direct routes and reloads
+        env:
+          INVEST_MODE: local_simulation
+          INVEST_STATIC_URL: http://127.0.0.1:8876
+        run: |
+          export INVEST_STATE_DIR="$RUNNER_TEMP/invest-static"
+          export INVEST_DB_PATH="$INVEST_STATE_DIR/workspace.db"
+          mkdir -p "$INVEST_STATE_DIR"
+          uv run --project backend --frozen uvicorn invest_lab.adapters.http:create_app --factory --host 127.0.0.1 --port 8876 > "$RUNNER_TEMP/static-api.log" 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8876/api/context > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8876/api/context > /dev/null
+          cd frontend
+          npm run test:static
+      - name: Keep browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-evidence
+          path: frontend/test-results
+          if-no-files-found: ignore

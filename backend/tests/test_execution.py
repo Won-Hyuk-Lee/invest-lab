@@ -286,3 +286,31 @@ def test_account_staleness_and_registered_session_expiry_block(execution):
     store.transition(order["id"], {"registered"}, "registered", service.at(), context=stale)
     with pytest.raises(TradingBlocked, match="거래일"):
         service.submit(order["id"])
+
+
+def test_second_process_cannot_steal_execution_lock(execution):
+    import subprocess
+    import sys
+
+    _, _, store = execution
+    program = """
+import sys
+from invest_lab.adapters.runtime_store import RuntimeStore
+from invest_lab.domain.errors import TradingBlocked
+store = RuntimeStore(sys.argv[1])
+try:
+    with store.execution_lock():
+        print('unexpected_acquisition')
+except TradingBlocked:
+    print('blocked')
+"""
+    with store.execution_lock() as generation:
+        other = subprocess.run(
+            [sys.executable, "-c", program, str(store.path)],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=True,
+        )
+        assert other.stdout.strip() == "blocked"
+        store.assert_generation(generation)
