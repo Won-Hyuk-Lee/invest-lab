@@ -9,6 +9,11 @@ dependencies = [
   "httpx>=0.28,<1",
   "python-dotenv>=1.0,<2",
   "tzdata>=2025.1",
+  "numpy>=2,<3",
+  "scikit-learn>=1.6,<2",
+  "pyarrow>=19,<24",
+  "websockets>=14,<17",
+  "cryptography>=44,<50",
 ]
 
 [dependency-groups]
