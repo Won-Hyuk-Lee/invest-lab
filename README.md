@@ -4,27 +4,55 @@
 
 코스피 보통주와 국내 상장 ETF를 분석하고, 규칙 전략·재무·매크로·통계모델을 검증하는 개인용 투자 연구실입니다. 프론트는 React + TypeScript, 백엔드는 Python입니다.
 
-**로컬 샘플 실행과 한국투자증권 모의계좌 연결을 지원합니다.** 두 모드의 주문·잔고 저장 공간을 분리합니다. 실제 돈을 거래하는 실전 서버는 지원하지 않습니다. 처음 사용할 때 필요한 준비는 **[사용자가 할 일](docs/user-actions.md)** 한 문서에서 확인하세요.
+**로컬 샘플 실행과 한국투자증권 모의계좌 연결을 지원합니다.** 두 모드의 주문·잔고 저장 공간을 분리합니다. 실제 돈을 거래하는 실전 서버는 지원하지 않습니다.
 
-## 실행
+## 사무실 PC에서 시작하기
 
-저장소 루트 `C:\Users\Lee\Desktop\갠플\invest-lab`에서 실행합니다.
+Windows PowerShell 기준입니다. **코드 + 실행 도구만 있으면 샘플 실행**, 여기에 **저장소 루트의 `.env`를 더하면 한투 모의 연결**이 가능합니다. 기존 전략·연구·주문 기록까지 이어가려면 로컬 데이터 백업도 필요합니다. 저장소는 원하는 폴더에 둘 수 있으며 집 PC와 같은 경로일 필요가 없습니다.
+
+1. Git, uv, npm이 포함된 **Node.js 24.x의 24.15.0 이상**을 설치합니다. Python 3.12와 프로젝트 의존성은 실행 스크립트가 uv로 준비합니다. 최초 설치에는 인터넷이 필요합니다.
+2. 저장소를 클론합니다. 이미 클론했다면 변경 사항을 확인하고 `git pull --ff-only origin main`으로 갱신합니다.
 
 ```powershell
-# 화면 + API + 작업자를 함께 실행합니다. 기본값은 로컬 샘플입니다.
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run.ps1
+# 원하는 작업 폴더에서 실행
+git clone https://github.com/Won-Hyuk-Lee/invest-lab.git
+Set-Location .\invest-lab
+```
 
-# 한투 모의계좌 모드
+3. 저장소 루트에서 샘플 화면을 실행합니다. `.env` 없이도 가능합니다.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run.ps1
+```
+
+4. 한투 모의를 사용하려면 실행을 종료하고, 별도로 전달한 `.env`를 저장소 루트에 둡니다. 처음 연결할 때 `KIS_PAPER_ORDERS_ENABLED=false`를 확인한 다음 실행합니다.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\manage.ps1 --mode kis_paper doctor
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\manage.ps1 --mode kis_paper paper-read-check
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run.ps1 -Mode kis_paper
 ```
 
+`doctor`는 설정 유무를 검사합니다. `paper-read-check`는 실제 모의계좌를 조회하고 로컬 대조 기록을 저장하며 주문을 전송하지 않습니다. 새 PC의 연결 성공이 자동매매 준비 완료를 뜻하지는 않습니다. 거래일·시장 자료와 실행 설정은 별도로 준비합니다.
+
 - 화면: <http://127.0.0.1:8000> · API 문서: <http://127.0.0.1:8000/docs>
 - `Ctrl+C`로 서버와 함께 시작한 작업자를 종료합니다. 브라우저만 닫으면 작업자는 계속 실행합니다. PC 종료·절전 중에는 실행되지 않습니다.
-- 첫 실행에는 `uv`, npm이 포함된 Node.js가 필요합니다. Node **24.15 이상**을 권장하며, 정확한 허용 범위는 `frontend/package.json`에 있습니다. Python 3.12와 의존성은 잠금 파일을 사용해 설치합니다.
-- 처음 설치/빌드한 뒤에는 `-SkipSetup`으로 설치를 건너뛸 수 있습니다. 포트 충돌 시 기존 실행을 종료하거나 `-Port 8001`을 사용하세요.
-- 개발 중에는 `scripts/backend.ps1`, `scripts/frontend.ps1`, `scripts/worker.ps1`을 각각 사용할 수도 있습니다. 개발 화면은 5173번 포트입니다.
+- 처음 설치/빌드한 뒤에는 `-SkipSetup`으로 설치를 건너뛸 수 있습니다. 코드를 pull한 뒤에는 이 옵션 없이 실행해 의존성과 화면을 갱신하세요. 포트 충돌 시 `-Port 8001`을 사용할 수 있습니다.
+- 같은 모의계좌의 작업자는 한 PC에서만 실행합니다. 사무실로 옮길 때 집 PC의 작업자를 먼저 종료하세요. 실행권과 호출 제한은 PC 사이에 공유되지 않습니다.
 
-서버는 `127.0.0.1`에만 열립니다. 개인 PC에서 쓰는 구성이며 공개 서버 인증·원격 인프라는 이번 범위에 포함하지 않습니다.
+설치 링크, `.env` 준비, 집↔사무실 동기화, 백업·복원, 오류 해결은 **[다른 PC에서 시작하고 이어가기](docs/workstation-setup.md)**에 있습니다. Codex나 특정 IDE 설치는 앱 실행의 필수 조건이 아닙니다.
+
+서버는 `127.0.0.1`에만 열립니다. `.ps1` 실행기는 Windows용입니다. 다른 OS의 실행 방법은 [개발 안내](docs/development.md)를 참고하세요. 공개 서버 인증·원격 인프라는 이번 범위에 포함하지 않습니다.
+
+## 문서 읽는 순서
+
+| 목적 | 문서 |
+| --- | --- |
+| 새 PC 설치, 코드 동기화, 기존 데이터 이전 | [다른 PC에서 시작하고 이어가기](docs/workstation-setup.md) |
+| AI 도구와 개발자가 지킬 작업 원칙 | [AGENTS.md](AGENTS.md) |
+| 개발 서버, 테스트, API 계약, 현재 인계 상태 | [개발 안내](docs/development.md) |
+| 외부 키·자료 준비, 실제 모의 검증과 한 달 관찰 | [사용자가 할 일](docs/user-actions.md) |
+| 기존 구현의 검증 결과와 남은 외부 검증 | [2026-09-27 구현 검증 기록](docs/2026-09-27-implementation-verification.md) |
 
 ## 현재 동작
 
@@ -44,9 +72,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run.ps1 -Mode kis_
 
 ## 확인한 것과 남은 것
 
-2026-09-27에는 앱의 한투 모의 어댑터로 현재가·계좌 조회와 잔고 대조를 확인했습니다. 02:55 KST 검사에서 대조 결과는 `matched`, 조회된 주문과 전송한 주문은 모두 0건이었습니다. 가입 키/계좌/HTS ID 설정은 준비됐고, `KIS_PAPER_ORDERS_ENABLED=false`를 유지합니다. 이전 설명식 `.env`는 표준 필드로 정리됐으며 원본은 Git 제외 경로에 보관했습니다.
+2026-09-27에는 집 PC에서 앱의 한투 모의 어댑터로 현재가·계좌 조회와 잔고 대조를 확인했습니다. 02:55 KST 검사에서 대조 결과는 `matched`, 조회된 주문과 전송한 주문은 모두 0건이었습니다. 당시 키/계좌/HTS ID를 설정하고 `KIS_PAPER_ORDERS_ENABLED=false`로 확인했습니다. 이 설정은 Git에 없으므로 새 PC에서는 `.env`를 별도로 준비하고 다시 진단해야 합니다.
 
-현재 마스터의 공개 원본은 수집했지만 **현재 목록은 역사 유니버스의 증거가 아닙니다.** ETF 지리/상품 분류, 검증된 거래 달력, 역사 원주가/기업행동, 재무 원문과 매크로 빈티지 확보는 별도입니다. DART/FRED/KRX 키는 아직 설정되지 않았습니다.
+당시 현재 마스터의 공개 원본은 수집했지만 **현재 목록은 역사 유니버스의 증거가 아닙니다.** ETF 지리/상품 분류, 검증된 거래 달력, 역사 원주가/기업행동, 재무 원문과 매크로 빈티지 확보는 별도입니다. 2026-09-27 검증 시 DART/FRED/KRX 키는 미설정이었으며, 현재 PC의 설정 유무는 `doctor`로 확인합니다.
 
 오프라인 화면 흐름에서 매수·매도·백테스트·Ridge 실험·보고서 연결을 확인했고, 합성 500세션 비교 실험에서 8개 모델을 생성했습니다. 합성 실험의 실제 자료 검증 상태는 계속 `false`입니다. 실제 장중 모의 매매·정정/취소·WebSocket 복구, 실제 자료의 전체 PIT 검증, 연속 운영과 한 달 관찰은 완료되지 않았습니다. **G1~G5를 전체 통과했다고 표시하지 않습니다.** 구체적인 준비·검증 순서는 [사용자가 할 일](docs/user-actions.md)에 모았습니다.
 
@@ -66,6 +94,9 @@ backend/src/invest_lab/
   worker.py                    일정·수집·분석·대조·감시 작업자
   cli.py                       진단·가져오기·백업·복구 도구
 scripts/                       통합 실행·개발 실행·관리 명령
+AGENTS.md                      개발 도구와 개발자를 위한 작업 원칙
+docs/workstation-setup.md      설치·PC 전환·백업 복원
+docs/development.md            개발 실행·검증·인계
 docs/user-actions.md           사용자 준비/외부 검증의 단일 진입 문서
 .local/                        실제 로컬 상태와 원본 (Git 제외)
 ```
@@ -76,21 +107,6 @@ docs/user-actions.md           사용자 준비/외부 검증의 단일 진입 �
 
 ## 개발 검증
 
-```powershell
-# backend에서
-uv run --frozen pytest -q
-uv run --frozen ruff check .
-uv run --frozen ruff format --check .
-
-# frontend에서
-npm ci
-npm run build
-npm test
-npm run format:check
-npm run api:check
-npm run test:e2e
-```
-
-Playwright 브라우저 설치가 필요한 환경은 최초 한 번 `npx playwright install chromium`을 실행합니다. 실제 한투 주문 검증은 이 오프라인 테스트와 분리합니다.
+복사해서 실행할 검증 명령은 [개발 안내](docs/development.md)에 모았습니다. OpenAPI 계약은 외부 계좌 없이 파일로 내보내 검사합니다. 브라우저 테스트는 Windows에서 기본적으로 Edge를 사용합니다. 실제 한투 주문 검증은 오프라인 테스트와 분리합니다.
 
 설계 근거는 [완료 계획](docs/paper-investment-completion-plan.md), [데이터 계약](docs/paper-investment-data-contracts.md), [전체 작업 목록](docs/research-roadmap.md), [지표 정의](docs/indicator-catalog.md)에 있습니다. 9월 25일 MVP 기록과 9월 27일 최초 감사/연결 기록은 **그 시점의 기록**이며, 현재 실행 방법과 준비 상태는 이 README와 [사용자가 할 일](docs/user-actions.md)을 우선합니다.
