@@ -1,6 +1,8 @@
 # invest-lab
 
-**2026-09-29 집 PC 인계:** 최신 작업 브랜치는 `feature/real-data-backtest`입니다. 이번 작업은 `main`에 병합하지 않았으므로 `main`만 pull하면 포함되지 않습니다. 먼저 [작업 인계서](docs/handoff-2026-09-29.md)를 읽고 코드와 별도 연구 자료를 가져오세요. [.env 외 이전할 자료와 복원 순서](docs/handoff-2026-09-29.md#3-별도로-옮길-연구-자료), [미국 ETF 전략 논의 기록](docs/us-etf-strategy-discussion-2026-09-29.md)을 함께 정리했습니다.
+**2026-09-29 연구 종합:** ETF·매크로, 자동 모델, 선정·위험 배분의 **834개 실행 조건**을 비교했습니다. 수익 중심 다음 모의운용 후보는 **QQQ 월별 추세 100/50**, 분산·하락 완화 후보는 **SPY·QQQ·IEF·GLD 모멘텀**입니다. [최종 판단·상세 결과·재현 문서](docs/research-conclusions-2026-09-29.md)를 먼저 읽으세요. 과거 탐색 결과이며 주문 활성화나 미래 성과 검증을 뜻하지 않습니다.
+
+최신 작업 브랜치는 **`feature/real-data-backtest`**입니다. `main`에 병합하지 않았으므로 해당 브랜치로 전환해야 합니다. 기존 국내 연구와 별도 자료 이전은 [작업 인계서](docs/handoff-2026-09-29.md), 설치는 [다른 PC에서 시작하고 이어가기](docs/workstation-setup.md)를 참고하세요.
 
 구현 범위와 실제/합성 검증의 구분은 [2026-09-27 구현 검증 기록](docs/2026-09-27-implementation-verification.md)에 정리했습니다.
 
@@ -50,6 +52,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run.ps1 -Mode kis_
 
 | 목적 | 문서 |
 | --- | --- |
+| ETF 연구 전체 판단, 후보 선정, 결과와 재현 자료 | [연구 종합 판단](docs/research-conclusions-2026-09-29.md) |
 | 2026-09-29 최신 코드, 연구 자료, 집에서 재개할 작업 | [작업 인계서](docs/handoff-2026-09-29.md) |
 | 미국 ETF·VIX·RSI·중장기 추세추종의 논의와 미결정 사항 | [전략 논의 기록](docs/us-etf-strategy-discussion-2026-09-29.md) |
 | 새 PC 설치, 코드 동기화, 기존 데이터 이전 | [다른 PC에서 시작하고 이어가기](docs/workstation-setup.md) |

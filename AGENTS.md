@@ -6,7 +6,7 @@
 
 1. `git status --short --branch`와 최근 커밋을 확인한다. 사용자의 미완성 변경을 덮어쓰거나 임의로 정리하지 않는다.
 2. [README](README.md), [다른 PC에서 시작하고 이어가기](docs/workstation-setup.md), [개발 안내](docs/development.md)를 읽는다. 모의 운영/데이터 작업이라면 [사용자가 할 일](docs/user-actions.md)도 읽는다.
-   2026-09-29 작업의 최신 인계는 [작업 인계서](docs/handoff-2026-09-29.md)다. 미국 ETF 전략은 논의 단계이며 구현/운용 승인을 받은 것으로 해석하지 않는다.
+   ETF 후속 연구의 현재 판단과 상세 문서 목록은 [연구 종합 판단](docs/research-conclusions-2026-09-29.md)을 먼저 읽는다. 국내 작업 인계는 [작업 인계서](docs/handoff-2026-09-29.md)다. 이후 사용자 승인으로 독립 SPY·QQQ 연구를 구현했다. [ETF 연구 안내](docs/etf-research-guide.md)와 [결과 보고서](docs/etf-research-results-2026-09-29.md)를 읽는다. ETF 연구 승인은 실전/모의 주문 활성화 승인이 아니다.
 3. 기록에 나온 설치·키·자료·외부 연결 성공은 기록 날짜와 PC에 한정한다. 새 클론에 `.env`, `.local`, 의존성이 있다고 가정하지 않는다.
 4. 현재 작업과 관련된 코드·테스트를 먼저 확인한다. 설계 배경은 [완료 계획](docs/paper-investment-completion-plan.md), [데이터 계약](docs/paper-investment-data-contracts.md)에 있다. 현재 동작은 코드와 최신 검증 결과로 확인한다.
 
@@ -14,6 +14,9 @@
 
 - 내부 연구/운영 화면은 **React + TypeScript + Vite + React Query**, 백엔드는 **Python 3.12 + FastAPI**다. `me` 포트폴리오와 별도 저장소이며 Next.js 프로젝트가 아니다.
 - 대상은 코스피 보통주와 국내 상장 ETF(미국 지수 추종 포함)다. 7·30·90일 등락률은 **거래일** 기준이다.
+- 독립 `etf_cli.py`의 SPY·QQQ 연구는 `.local/etf-research/`만 사용하며 기존 KOSPI 전략/운용 DB/브로커로 연결하지 않는다. 전략별 상태와 설정을 독립적으로 유지한다.
+- 후속 `auto_cli.py`는 `.local/auto-models/`에서 장기·단기·여러 자산·초기 자금 구획 조합을 연구한다. 최신 [실행 안내](docs/auto-models-guide.md)와 [결과](docs/auto-models-results-2026-09-29.md)를 확인한다. 과거 최고 규칙을 자동 채택하거나 이 결과로 주문을 활성화하지 않는다.
+- 선정/위험 배분 후속 연구는 `selection_cli.py`와 `.local/selection-research/`를 사용한다. [실행 안내](docs/selection-research-guide.md), [423개 조건 결과](docs/selection-research-results-2026-09-29.md)를 읽는다. 재무 포트폴리오 집계 진단을 자체 개별 주식 선정 성과로 표현하지 않는다. 새 의사결정 함수는 기존 자동 모델 원장에 주입하며 기본 규칙/운용 설정을 유지한다.
 - 기본 연구 방향은 상승 추세의 코스피 눌림목과 ETF 추세 비교다. 일봉 전체 분석 후 후보 10~20개와 보유 종목을 감시한다. LLM이 주문을 결정하는 구조로 바꾸지 않는다.
 - `backend/src/invest_lab/domain/`: 지표·전략·위험·연구의 순수 규칙.
 - `application/`: 유스케이스, `ports/`: 외부 의존성의 인터페이스, `adapters/`: HTTP·SQLite·브로커·원천 수집·학습기 구현.

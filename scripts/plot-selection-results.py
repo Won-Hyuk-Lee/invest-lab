@@ -98,7 +98,6 @@ def main():
     path = Path(args.output)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=140)
-    fig.savefig(path.with_suffix(".svg"))
     print(str(path))
 
 
