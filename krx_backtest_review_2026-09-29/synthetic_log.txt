@@ -1,0 +1,51 @@
+{
+  "scope": "Synthetic engine behavior checks; not a real-data rerun or the application test suite.",
+  "checks": [
+    {
+      "name": "holding_expiry",
+      "configured": 10,
+      "entry": "2024-06-25",
+      "exit": "2024-07-10",
+      "open_to_open_intervals": 11,
+      "reproduced": true
+    },
+    {
+      "name": "future_raw_revision_changes_historical_fill",
+      "original_fill": 112.55624999999999,
+      "future_revision_fill": 113.55675,
+      "revision_available_at": "2026-09-29T09:00:00+00:00",
+      "reproduced": true
+    },
+    {
+      "name": "sell_intent_dropped_after_unfilled",
+      "first_requested_execution": "2024-06-27",
+      "reopening": "2024-06-28",
+      "actual_execution": "2024-07-01",
+      "delay_sessions": 1,
+      "reproduced": true
+    },
+    {
+      "name": "evening_universe_gates_same_day_open",
+      "execution_session": "2024-06-25",
+      "universe_available_at": "2024-06-25T09:00:00+00:00",
+      "baseline_has_buy": true,
+      "changed_evening_universe_has_buy": false,
+      "reproduced": true
+    },
+    {
+      "name": "small_size_example",
+      "price": 100,
+      "stop_distance": 10,
+      "quantity": 2435,
+      "position_value": 243500,
+      "allocation_pct": 2.435,
+      "risk_budget_pct": 0.25
+    }
+  ],
+  "indicator_sanity": {
+    "up": 100.0,
+    "down": 0.0,
+    "constant": 50.0,
+    "too_short": null
+  }
+}
