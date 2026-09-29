@@ -121,6 +121,31 @@ def test_dart_latest_table_never_claims_point_in_time_original():
     assert source.latest_financials("x", 2023, "11011")["revised_only"] is True
 
 
+def test_dart_large_company_directory_retains_receipt_xml_limit():
+    content = (
+        b"<result>"
+        + b" " * 20_000_000
+        + b"<list><corp_code>00126380</corp_code><stock_code>005930</stock_code>"
+        b"</list></result>"
+    )
+    with pytest.raises(ResearchSourceError, match="unsafe_or_oversized"):
+        safe_xml(content)
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as output:
+        output.writestr("CORPCODE.xml", content)
+    source = DartSource(
+        "test-key",
+        client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(200, content=archive.getvalue())
+            )
+        ),
+    )
+    assert source.companies() == [{"corp_code": "00126380", "stock_code": "005930"}]
+    with pytest.raises(ResearchSourceError, match="unsafe_or_oversized"):
+        safe_xml(b"<!DOCTYPE x><x/>", max_bytes=50_000_000)
+
+
 def test_krx_code_is_string_and_missing_release_clock_is_not_pit_verified():
     def handler(request):
         assert request.headers["AUTH_KEY"] == "key"
