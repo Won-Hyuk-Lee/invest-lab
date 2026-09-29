@@ -105,6 +105,91 @@ def test_atr_is_wilder_and_price_split_adjustment_is_as_of():
     assert after[0]["volume"] == before[0]["volume"] * 2
 
 
+@pytest.mark.parametrize("intraday_stop", [False, True])
+def test_halted_day_uses_published_close_for_valuation_without_fill_or_signal(
+    monkeypatch, intraday_stop
+):
+    data = synthetic_research_dataset(130)
+    symbol = "005930"
+    halted_session = data["sessions"][126]
+    published_close = next(
+        row["close"]
+        for row in data["bars"]
+        if row["symbol"] == symbol and row["session"] == halted_session
+    )
+    for row in data["bars"]:
+        if row["symbol"] == symbol and row["session"] == halted_session:
+            row.update(
+                open=0,
+                high=0,
+                low=0,
+                volume=0,
+                turnover=0,
+                tradable=False,
+                valuation_only=True,
+            )
+    next(row for row in data["universe"] if row["session"] == halted_session)["symbols"].remove(
+        symbol
+    )
+    validate_dataset(data)
+    seen_histories = []
+
+    def fixed_signal(technical, instrument, rules, *, position=None, **kwargs):
+        if instrument["symbol"] == symbol and technical["session"] == data["sessions"][127]:
+            seen_histories.append(technical["history_count"])
+        eligible = position is None and (
+            (instrument["symbol"] == symbol and technical["session"] == data["sessions"][124])
+            or (instrument["symbol"] == "105560" and technical["session"] == data["sessions"][125])
+        )
+        return {
+            "action": "hold",
+            "eligible": eligible,
+            "rank": 1,
+            "stop_distance": 1000,
+            "reasons": [],
+        }
+
+    monkeypatch.setattr("invest_lab.domain.strategies.evaluate_strategy", fixed_signal)
+    result = replay(data, StrategyRules(intraday_stop=intraday_stop))
+    assert any(t["symbol"] == symbol and t["side"] == "buy" for t in result["trades"])
+    assert not any(
+        t["session"] == halted_session and t["symbol"] == symbol for t in result["trades"]
+    )
+    assert any(
+        t["session"] == halted_session and t["symbol"] == "105560" and t["side"] == "buy"
+        for t in result["trades"]
+    )
+    halt_equity = next(r for r in result["equity_curve"] if r["session"] == halted_session)
+    position = result["open_positions"][symbol]
+    other_close = next(
+        float(row["close"])
+        for row in data["bars"]
+        if row["symbol"] == "105560" and row["session"] == halted_session
+    )
+    assert halt_equity["holdings_value"] == pytest.approx(
+        position["quantity"] * float(published_close)
+        + next(
+            trade["quantity"]
+            for trade in result["trades"]
+            if trade["symbol"] == "105560"
+            and trade["session"] == halted_session
+            and trade["side"] == "buy"
+        )
+        * other_close
+    )
+    assert seen_histories == [127]
+
+
+def test_valuation_only_row_rejects_executable_price():
+    data = synthetic_research_dataset(5)
+    row = data["bars"][0]
+    row.update(open=0, high=0, low=0, volume=0, turnover=0, tradable=False, valuation_only=True)
+    validate_dataset(data)
+    row["open"] = 1
+    with pytest.raises(ValueError, match="평가 전용"):
+        validate_dataset(data)
+
+
 def test_financial_ttm_uses_compatible_quarters_and_revisions_available_then():
     facts = []
     periods = [
