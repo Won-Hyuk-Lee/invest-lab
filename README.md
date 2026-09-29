@@ -1,5 +1,7 @@
 # invest-lab
 
+**2026-09-29 집 PC 인계:** 최신 작업 브랜치는 `feature/real-data-backtest`입니다. 이번 작업은 `main`에 병합하지 않았으므로 `main`만 pull하면 포함되지 않습니다. 먼저 [작업 인계서](docs/handoff-2026-09-29.md)를 읽고 코드와 별도 연구 자료를 가져오세요. [.env 외 이전할 자료와 복원 순서](docs/handoff-2026-09-29.md#3-별도로-옮길-연구-자료), [미국 ETF 전략 논의 기록](docs/us-etf-strategy-discussion-2026-09-29.md)을 함께 정리했습니다.
+
 구현 범위와 실제/합성 검증의 구분은 [2026-09-27 구현 검증 기록](docs/2026-09-27-implementation-verification.md)에 정리했습니다.
 
 코스피 보통주와 국내 상장 ETF를 분석하고, 규칙 전략·재무·매크로·통계모델을 검증하는 개인용 투자 연구실입니다. 프론트는 React + TypeScript, 백엔드는 Python입니다.
@@ -11,7 +13,7 @@
 Windows PowerShell 기준입니다. **코드 + 실행 도구만 있으면 샘플 실행**, 여기에 **저장소 루트의 `.env`를 더하면 한투 모의 연결**이 가능합니다. 기존 전략·연구·주문 기록까지 이어가려면 로컬 데이터 백업도 필요합니다. 저장소는 원하는 폴더에 둘 수 있으며 집 PC와 같은 경로일 필요가 없습니다.
 
 1. Git, uv, npm이 포함된 **Node.js 24.x의 24.15.0 이상**을 설치합니다. Python 3.12와 프로젝트 의존성은 실행 스크립트가 uv로 준비합니다. 최초 설치에는 인터넷이 필요합니다.
-2. 저장소를 클론합니다. 이미 클론했다면 변경 사항을 확인하고 `git pull --ff-only origin main`으로 갱신합니다.
+2. 저장소를 클론합니다. 이미 클론했다면 변경 사항을 확인하고 [작업 인계서](docs/handoff-2026-09-29.md)의 브랜치를 받습니다. 아래 기본 클론 직후에도 이번 연구를 이어가려면 `feature/real-data-backtest`로 전환해야 합니다.
 
 ```powershell
 # 원하는 작업 폴더에서 실행
@@ -48,6 +50,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run.ps1 -Mode kis_
 
 | 목적 | 문서 |
 | --- | --- |
+| 2026-09-29 최신 코드, 연구 자료, 집에서 재개할 작업 | [작업 인계서](docs/handoff-2026-09-29.md) |
+| 미국 ETF·VIX·RSI·중장기 추세추종의 논의와 미결정 사항 | [전략 논의 기록](docs/us-etf-strategy-discussion-2026-09-29.md) |
 | 새 PC 설치, 코드 동기화, 기존 데이터 이전 | [다른 PC에서 시작하고 이어가기](docs/workstation-setup.md) |
 | AI 도구와 개발자가 지킬 작업 원칙 | [AGENTS.md](AGENTS.md) |
 | 개발 서버, 테스트, API 계약, 현재 인계 상태 | [개발 안내](docs/development.md) |

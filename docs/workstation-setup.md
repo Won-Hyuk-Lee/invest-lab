@@ -90,14 +90,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run.ps1 -Mode kis_
 
 ## 5. 집 ↔ 사무실에서 코드 이어가기
 
-작업 시작 시 저장소 루트에서:
+2026-09-29 연구를 이어가려면 [작업 인계서](handoff-2026-09-29.md)를 먼저 읽는다. 현재 인계 브랜치는 `feature/real-data-backtest`이며 `main`에는 이번 변경이 없다. 저장소 루트에서 변경 사항을 확인하고 보존한 뒤:
 
 ```powershell
 git status --short --branch
-git pull --ff-only origin main
+git fetch origin
+git switch feature/real-data-backtest
+git pull --ff-only origin feature/real-data-backtest
 ```
 
-이 저장소의 기본 작업 브랜치는 `main`이다. 다른 작업 브랜치에 있으면 해당 작업의 브랜치 절차를 따른다. 변경 사항이 남았으면 먼저 확인하고 보존한다. fast-forward가 불가능하면 중단하고 분기된 커밋을 비교하며 `reset --hard`나 강제 push로 맞추지 않는다.
+로컬에 해당 브랜치가 없고 `origin`에만 있으면 `git switch`가 원격 추적 브랜치를 만든다. 자동 추적이 꺼진 환경에서는 `git switch --track origin/feature/real-data-backtest`를 사용한다. 명령이 실패하면 다음 단계로 진행하지 않는다. 다른 작업을 이어갈 때에는 해당 인계의 브랜치를 사용한다. fast-forward가 불가능하면 중단하고 분기된 커밋을 비교하며 `reset --hard`나 강제 push로 맞추지 않는다. 브랜치 간 병합은 PR로 수행한다.
 
 pull 이후에는 다시 설치/빌드하는 실행 명령을 쓴다.
 
@@ -110,6 +112,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run.ps1
 `.env`, `.local`, `.venv`, `node_modules`는 동기화되지 않는다. **집과 사무실에서 같은 모의계좌 작업자를 동시에 돌리지 않는다.** 서로의 실행권·호출 예산·주문 의도를 공유하지 않기 때문이다. 사무실에서 코드 수정이나 샘플 실행만 할 때는 기존 모의 운영 데이터를 옮길 필요가 없다.
 
 ## 6. 기존 데이터까지 이전하기
+
+이번 KRX/DART 연구는 아래의 앱 DB 백업과 별개인 원천·압축 결과 파일을 사용한다. [작업 인계서의 연구 자료 압축파일](handoff-2026-09-29.md#3-별도로-옮길-연구-자료)을 함께 가져와야 재수집 없이 이어갈 수 있다. 앱의 `backup` 명령만으로 임의 연구 폴더가 모두 포함되지는 않는다.
 
 기본 저장 위치는 `.local/`이다. 단순 개발/샘플 확인이면 이 절차를 건너뛸 수 있다. 계속 운영할 PC 하나를 정하고 그 PC의 데이터가 최신이라는 기준을 유지한다. DB 파일을 Git으로 병합하거나 실행 중인 `.local`을 동기화 프로그램으로 맞추지 않는다.
 

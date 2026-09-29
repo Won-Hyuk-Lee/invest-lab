@@ -6,6 +6,7 @@
 
 1. `git status --short --branch`와 최근 커밋을 확인한다. 사용자의 미완성 변경을 덮어쓰거나 임의로 정리하지 않는다.
 2. [README](README.md), [다른 PC에서 시작하고 이어가기](docs/workstation-setup.md), [개발 안내](docs/development.md)를 읽는다. 모의 운영/데이터 작업이라면 [사용자가 할 일](docs/user-actions.md)도 읽는다.
+   2026-09-29 작업의 최신 인계는 [작업 인계서](docs/handoff-2026-09-29.md)다. 미국 ETF 전략은 논의 단계이며 구현/운용 승인을 받은 것으로 해석하지 않는다.
 3. 기록에 나온 설치·키·자료·외부 연결 성공은 기록 날짜와 PC에 한정한다. 새 클론에 `.env`, `.local`, 의존성이 있다고 가정하지 않는다.
 4. 현재 작업과 관련된 코드·테스트를 먼저 확인한다. 설계 배경은 [완료 계획](docs/paper-investment-completion-plan.md), [데이터 계약](docs/paper-investment-data-contracts.md)에 있다. 현재 동작은 코드와 최신 검증 결과로 확인한다.
 
@@ -51,6 +52,6 @@
 ## 커밋·인계
 
 - 명시된 원격/브랜치를 확인하고 사용자 요청 범위에서 커밋·푸시한다. 관련 파일만 stage하고 diff를 확인한다. 사용자 변경을 임의로 stash/reset/force-push하지 않는다.
-- 최신 코드를 받을 때는 변경 사항을 먼저 확인하고 `git pull --ff-only origin main`을 사용한다. 분기/충돌을 강제로 덮어쓰지 않는다.
+- 최신 코드를 받을 때는 변경 사항과 인계 문서의 대상 브랜치를 먼저 확인한다. 이번 인계는 `feature/real-data-backtest`에서 `git pull --ff-only origin feature/real-data-backtest`를 사용하며, 작업 브랜치에서 `main`을 임의로 pull하지 않는다. 분기/충돌을 강제로 덮어쓰지 않는다.
 - 커밋에 `.env`, `.local`, 계좌/토큰/백업이 포함되지 않았는지 확인한다.
 - 완료 시 변경 내용, 실제 실행한 검증, 남은 외부 확인, 커밋·푸시 결과를 짧게 남긴다. 다른 PC에서 재현할 수 있는 명령과 저장소 상대 경로를 문서에 사용한다.
