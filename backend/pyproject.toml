@@ -14,6 +14,7 @@ dependencies = [
   "pyarrow>=19,<24",
   "websockets>=14,<17",
   "cryptography>=44,<50",
+  "xlrd>=2,<3",
 ]
 
 [dependency-groups]
