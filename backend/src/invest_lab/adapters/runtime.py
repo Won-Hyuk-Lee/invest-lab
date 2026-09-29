@@ -14,11 +14,17 @@ from invest_lab.application.execution import ExecutionService
 from invest_lab.domain.errors import TradingBlocked, VersionConflict
 from invest_lab.domain.indicators import analyze
 from invest_lab.domain.orders import TERMINAL, decimal
+from invest_lab.domain.portfolio_policy import (
+    holding_sessions,
+    pending_order_risk,
+    portfolio_risk,
+    risk_reductions,
+)
 from invest_lab.domain.research import latest_visible, macro_features
 from invest_lab.domain.strategies import (
     StrategyRules,
     evaluate_strategy,
-    size_position,
+    position_size_details,
     technical_features,
 )
 
@@ -505,7 +511,7 @@ class Runtime:
                     signal["reasons"].append("model_filter_or_feature_coverage")
         eligible = sorted(
             [s for s in signals if s["eligible"]], key=lambda s: s.get("rank") or 0, reverse=True
-        )[:20]
+        )[: rules.candidate_limit]
         watch = {
             "items": eligible,
             "all_signals": signals,
@@ -968,7 +974,48 @@ class Runtime:
         def active_orders():
             return [o for o in self.store.all_orders() if o["state"] not in TERMINAL]
 
-        def execute(signal, side, quantity, quote):
+        account_positions = {p["symbol"]: p for p in account["positions"]}
+        risk_positions = {
+            s: {
+                **(self.store.document("allocation", s) or {"managed_quantity": 0}),
+                "quantity": p["quantity"],
+                "index_group": indices.get(s),
+                "tradable": p["sellable_quantity"] > 0,
+            }
+            for s, p in account_positions.items()
+        }
+        reductions = risk_reductions(
+            risk_positions,
+            {
+                s: float(p["value"]) / p["quantity"]
+                for s, p in account_positions.items()
+                if p["quantity"]
+            },
+            {s: asdict(i) for s, i in instruments.items()},
+            rules,
+            equity=float(account["equity"]),
+        )
+        # Cancel confirmed automatic entry reservations before a risk reduction.
+        # Reconciliation, not the cancellation acknowledgement, releases a budget.
+        if loss_limit or reductions:
+            for order in active_orders():
+                if order["side"] != "buy" or order.get("context", {}).get("origin") != "automatic":
+                    continue
+                if order["state"] == "registered":
+                    self.store.transition(
+                        order["id"], {"registered"}, "expired", self.at(), error="risk_entry_halt"
+                    )
+                else:
+                    self.execution.cancel(
+                        order["id"],
+                        f"risk-cancel:{today}:{order['id']}",
+                        order["remaining_quantity"],
+                    )
+            if self.execution.reconcile()["status"] != "matched":
+                raise TradingBlocked("위험 축소 전 매수 취소 대조가 필요합니다.")
+            account = self.broker.account()
+
+        def execute(signal, side, quantity, quote, sizing=None):
             symbol = signal["symbol"]
             client_id = str(
                 uuid5(
@@ -989,7 +1036,15 @@ class Runtime:
                 "index_id": indices.get(symbol),
                 "index_map": indices,
                 "stop_price": float(quote["price"]) - (signal.get("stop_distance") or 0),
+                "initial_stop_distance": signal.get("stop_distance"),
+                "exit_kind": signal.get("exit_kind"),
+                "exit_intent_id": signal.get("exit_intent_id"),
+                "rotation_id": signal.get("rotation_id"),
                 "valid_session": today,
+                "execution_policy": "quote_observed_first_30_minutes"
+                if side == "buy"
+                else "quote_observed_managed_exit",
+                "sizing": sizing,
                 "risk_policy": {
                     "max_position_pct": rules.max_position_pct,
                     "max_invested_pct": rules.max_total_pct,
@@ -1029,55 +1084,151 @@ class Runtime:
             symbol = position["symbol"]
             allocation = self.store.document("allocation", symbol) or {}
             managed = min(allocation.get("managed_quantity", 0), position["sellable_quantity"])
-            if (
-                not managed
-                or symbol not in signals
-                or any(o["symbol"] == symbol for o in active_orders())
-            ):
+            if not allocation.get("managed_quantity", 0):
                 continue
-            opened = allocation.get("opened_session", today)
+            opened = allocation.get("opened_session")
+            if not opened:
+                skipped.append({"symbol": symbol, "reason": "관리 포지션 진입일 확인 필요"})
+                continue
+            signal = signals.get(symbol)
+            signal_session = signal["as_of"] if signal else watch["as_of"]
             if self.market_store:
-                holding_sessions = max(
-                    0, len(self.market_store.sessions(opened, today, as_of=now)) - 1
-                )
+                known_sessions = [
+                    r["session"] for r in self.market_store.sessions(opened, today, as_of=now)
+                ]
             else:
-                holding_sessions = sum(
-                    opened <= b.session.isoformat() <= today
-                    for b in self.workspace.market.history(symbol)
+                known_sessions = [
+                    b.session.isoformat() for b in self.workspace.market.history(symbol)
+                ]
+            age = holding_sessions(opened, signal_session, known_sessions)
+            lifecycle = allocation.get("position_id", symbol + ":" + opened)
+            assessment_key = f"{lifecycle}:{deployment['version']}:{signal_session}"
+            result = self.store.document("exit_assessment", assessment_key)
+            if result is None and signal:
+                result = evaluate_strategy(
+                    signal["technical"],
+                    asdict(instruments[symbol]),
+                    rules,
+                    position={
+                        **allocation,
+                        "quantity": allocation["managed_quantity"],
+                        "holding_sessions": age,
+                    },
                 )
-            signal = signals[symbol]
-            result = evaluate_strategy(
-                signal["technical"],
-                asdict(instruments[symbol]),
-                rules,
-                position={
-                    "stop_price": allocation.get("stop_price", 0),
-                    "holding_sessions": holding_sessions,
-                },
-            )
+                allocation.update(result.get("position_updates", {}))
+                self.store.put_document("allocation", allocation, symbol)
+                self.store.put_document("exit_assessment", result, assessment_key)
+            result = result or {"action": "hold", "reasons": []}
+            exit_key = lifecycle
+            intention = self.store.document("exit_intent", exit_key)
+            if intention:
+                filled = sum(
+                    o["filled_quantity"]
+                    for o in self.store.all_orders()
+                    if o.get("context", {}).get("exit_intent_id") == intention["id"]
+                )
+                intention["remaining"] = max(0, intention["quantity"] - filled)
+                intention["status"] = "completed" if intention["remaining"] == 0 else "pending"
+                self.store.put_document("exit_intent", intention, exit_key)
             quote = self.execution._quote(symbol, automatic=True)
             intraday_stop = rules.intraday_stop and float(quote["price"]) <= allocation.get(
                 "stop_price", 0
             )
-            if result["action"] == "sell" or intraday_stop:
-                if not execute(signal, "sell", managed, quote):
+            expire = age >= rules.max_holding_sessions + (
+                rules.holding_extension_sessions if allocation.get("trailing_active") else 0
+            )
+            reduction = reductions.get(symbol, 0)
+            trigger = result["action"] == "sell" or intraday_stop or expire or reduction > 0
+            hard = intraday_stop or expire or result.get("exit_kind") == "full"
+            if trigger and (
+                not intention
+                or (hard and intention.get("kind") != "full")
+                or (
+                    reduction
+                    and intention.get("remaining", 0) < reduction
+                    and intention.get("kind") != "full"
+                )
+                or (
+                    intention["status"] == "completed"
+                    and intention["signal_session"] != signal_session
+                )
+            ):
+                quantity = (
+                    allocation["managed_quantity"]
+                    if hard
+                    else min(
+                        allocation["managed_quantity"],
+                        max(reduction, result.get("exit_quantity", 0)),
+                    )
+                )
+                kind = (
+                    "full"
+                    if hard
+                    else "risk_reduction"
+                    if reduction
+                    else result.get("exit_kind", "full")
+                )
+                intention = {
+                    "id": f"{lifecycle}:{signal_session}:{kind}",
+                    "position_id": lifecycle,
+                    "symbol": symbol,
+                    "signal_session": signal_session,
+                    "kind": kind,
+                    "reasons": sorted(
+                        set(
+                            result["reasons"]
+                            + (["intraday_stop"] if intraday_stop else [])
+                            + (["holding_expiry"] if expire else [])
+                            + (["portfolio_risk_reduction"] if reduction else [])
+                        )
+                    ),
+                    "quantity": quantity,
+                    "remaining": quantity,
+                    "status": "pending",
+                }
+                self.store.put_document("exit_intent", intention, exit_key)
+            if intention and intention["status"] == "pending":
+                if any(o["symbol"] == symbol for o in active_orders()):
+                    continue
+                if not managed:
+                    skipped.append(
+                        {"symbol": symbol, "reason": "청산 의도 유지: 매도 가능 수량 없음"}
+                    )
+                    continue
+                exit_signal = {
+                    **(signal or {"symbol": symbol}),
+                    "exit_kind": intention["kind"],
+                    "exit_intent_id": intention["id"],
+                    "exit_reasons": intention["reasons"],
+                }
+                if not execute(exit_signal, "sell", min(managed, intention["remaining"]), quote):
                     return {
                         "submitted": len(submitted),
                         "orders": submitted,
                         "skipped": skipped,
                         "session": today,
                     }
-        if (
+        entries_allowed = (
             entry_window
             and not loss_limit
+            and not reductions
             and self.store.document("control").get("entries_enabled")
-        ):
-            for signal in watch["items"]:
+        )
+        entry_signals = watch["items"]
+        if rules.rotation_enabled or self.store.documents("rotation_pair"):
+            from invest_lab.adapters.rotation_execution import RotationCoordinator
+
+            entry_signals = RotationCoordinator(
+                self, rules, signals, instruments, today, watch["as_of"], execute
+            ).run(entry_signals, entries_allowed=entries_allowed)
+        if entries_allowed:
+            for signal in entry_signals:
                 symbol = signal["symbol"]
                 account = self.broker.account()
                 positions = {p["symbol"]: p for p in account["positions"]}
                 pending = [o for o in active_orders() if o["side"] == "buy"]
                 if symbol in positions or any(o["symbol"] == symbol for o in active_orders()):
+                    skipped.append({"symbol": symbol, "reason": "기존 보유 또는 진행 중 주문"})
                     continue
                 exposure = {s: float(p["value"]) for s, p in positions.items()}
                 for order in pending:
@@ -1103,7 +1254,7 @@ class Runtime:
                 index_value = sum(
                     v for s, v in exposure.items() if index_id and indices.get(s) == index_id
                 )
-                quantity = size_position(
+                sizing = position_size_details(
                     equity=float(account["equity"]),
                     cash=float(account.get("buying_power", account["cash"])),
                     price=price,
@@ -1112,9 +1263,40 @@ class Runtime:
                     sector_value=sector,
                     index_value=index_value,
                     volume20=signal["technical"].get("volume20"),
+                    open_risk=portfolio_risk(
+                        {
+                            s: {
+                                **(self.store.document("allocation", s) or {}),
+                                "quantity": p["quantity"],
+                            }
+                            for s, p in positions.items()
+                        },
+                        {
+                            s: float(p["value"]) / p["quantity"]
+                            for s, p in positions.items()
+                            if p["quantity"]
+                        },
+                        reserved=pending_order_risk(pending),
+                    ),
                     rules=rules,
                 )
-                if quantity and not execute(signal, "buy", quantity, quote):
+                quantity = sizing["quantity"]
+                observed_at = self.at()
+                self.store.put_document(
+                    "sizing_decisions",
+                    {
+                        "session": today,
+                        "symbol": symbol,
+                        "at": observed_at,
+                        "deployment_version": deployment["version"],
+                        "sizing": sizing,
+                        "execution_policy": "quote_observed_first_30_minutes",
+                    },
+                    f"{today}:{deployment['version']}:{symbol}:{observed_at}",
+                )
+                if not quantity:
+                    skipped.append({"symbol": symbol, "reason": "주문 수량 0", "sizing": sizing})
+                elif not execute(signal, "buy", quantity, quote, sizing):
                     break
         return {
             "submitted": len(submitted),

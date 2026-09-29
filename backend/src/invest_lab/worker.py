@@ -135,8 +135,9 @@ class WorkerStream:
             p["symbol"] for p in account.get("positions", []) if p.get("quantity", 0) > 0
         )
         watch = self.runtime.store.document("watchlist") or {}
-        candidates = [row["symbol"] for row in watch.get("items", [])][:20]
         deployment = self.runtime.store.document("deployment") or {}
+        candidate_limit = deployment.get("rules", {}).get("candidate_limit", 20)
+        candidates = [row["symbol"] for row in watch.get("items", [])][:candidate_limit]
         books = deployment.get("stream_books", False) is True
         signature = (tuple(holdings), tuple(candidates), books)
         if signature != self._last_configuration:

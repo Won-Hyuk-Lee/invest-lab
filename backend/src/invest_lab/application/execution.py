@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 from invest_lab.domain.errors import TradingBlocked
 from invest_lab.domain.order_chain import reconcile_order_chain
 from invest_lab.domain.orders import ACTIVE, TERMINAL, OrderRequest, decimal, valid_price
+from invest_lab.domain.portfolio_policy import apply_managed_fill
 
 
 class ExecutionService:
@@ -690,18 +691,20 @@ class ExecutionService:
                         ) + delta * (1 if order["side"] == "buy" else -1)
                         ledger["applied"][order["id"]] = filled
                         if delta and order["context"].get("origin") == "automatic":
-                            allocation = self.repo.document("allocation", symbol) or {
-                                "managed_quantity": 0,
-                                "opened_session": date,
-                            }
-                            allocation["managed_quantity"] += delta * (
-                                1 if order["side"] == "buy" else -1
-                            )
-                            allocation.update(
-                                strategy_version=order["context"].get("deployment_version"),
-                                stop_price=order["context"].get(
-                                    "stop_price", allocation.get("stop_price", 0)
+                            allocation = apply_managed_fill(
+                                self.repo.document("allocation", symbol),
+                                side=order["side"],
+                                quantity=delta,
+                                price=float(
+                                    (
+                                        decimal(graph["filled_amount"])
+                                        - decimal(order["filled_amount"])
+                                    )
+                                    / delta
                                 ),
+                                session=date,
+                                order_id=order["id"],
+                                context=order["context"],
                             )
                             self.repo.put_document("allocation", allocation, symbol)
                 if state != order["state"] or any(

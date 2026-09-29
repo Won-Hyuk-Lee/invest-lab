@@ -131,6 +131,10 @@ def test_automatic_buys_resize_after_each_actual_fill_and_do_not_overspend(tmp_p
     orders = runtime.store.all_orders()
     assert result["submitted"] == 2
     assert {order["symbol"]: order["quantity"] for order in orders} == {"005930": 59, "000660": 20}
+    for order in orders:
+        assert order["context"]["sizing"]["quantity"] == order["quantity"]
+        assert order["context"]["sizing"]["binding_constraints"]
+        assert order["context"]["execution_policy"] == "quote_observed_first_30_minutes"
     account = runtime.broker.account()
     assert Decimal(account["holdings_value"]) / Decimal(account["equity"]) <= Decimal("0.8")
     assert Decimal(account["cash"]) > 0
@@ -180,6 +184,179 @@ def test_unfilled_buy_reserves_total_exposure_and_position_slot(tmp_path):
     assert runtime.store.get_order(first["id"])["remaining_quantity"] == 20
     assert next(order for order in orders if order["symbol"] == "000660")["quantity"] == 21
     assert 20 * 90 + 21 * 100 <= 4000
+
+
+def test_partial_recovery_persists_fill_and_does_not_repeat_same_signal(tmp_path):
+    runtime = setup_runtime(
+        tmp_path,
+        rules={"exit_policy": "partial_trail"},
+        positions=[{"symbol": "005930", "quantity": 11, "average_price": "100"}],
+    )
+    runtime.store.put_document(
+        "allocation",
+        {
+            "position_id": "holding-cycle",
+            "managed_quantity": 11,
+            "opened_session": "2026-09-24",
+            "stop_price": 80,
+            "entry_price": 100,
+            "initial_stop_distance": 20,
+            "cost_basis_gross": 1100,
+        },
+        "005930",
+    )
+    row = signal("005930")
+    row["technical"]["sma"]["20"] = 99
+    watch(runtime, [row], entries=False)
+    runtime.auto_trade()
+    order = runtime.store.all_orders()[0]
+    assert order["quantity"] == 5
+    assert order["context"]["exit_kind"] == "partial_recovery"
+    assert runtime.store.document("allocation", "005930")["managed_quantity"] == 6
+    assert runtime.store.document("allocation", "005930")["stop_price"] == 98
+    assert runtime.auto_trade()["submitted"] == 0
+    assert runtime.store.document("exit_intent", "holding-cycle")["status"] == "completed"
+
+
+def test_calendar_and_local_holding_age_both_include_first_close(tmp_path):
+    for calendar in (True, False):
+        runtime = setup_runtime(
+            tmp_path / str(calendar),
+            rules={"max_holding_sessions": 1},
+            positions=[{"symbol": "005930", "quantity": 10, "average_price": "100"}],
+            calendar=calendar,
+        )
+        runtime.store.put_document(
+            "allocation",
+            {"managed_quantity": 10, "opened_session": "2026-09-24", "stop_price": 80},
+            "005930",
+        )
+        watch(runtime, [signal("005930")], entries=False)
+        assert runtime.auto_trade()["submitted"] == 1
+        assert runtime.broker.account()["positions"] == []
+
+
+@pytest.mark.parametrize("manual_residual", [False, True])
+def test_rotation_requires_full_managed_slot_and_separate_reconciled_purchase(
+    tmp_path, manual_residual
+):
+    runtime = setup_runtime(
+        tmp_path,
+        rules={"max_positions": 1, "rotation_enabled": True, "rotation_min_holding": 1},
+        positions=[{"symbol": "005930", "quantity": 10, "average_price": "100"}],
+        cash="9000",
+    )
+    runtime.store.put_document(
+        "allocation",
+        {
+            "position_id": "cycle-a",
+            "managed_quantity": 8 if manual_residual else 10,
+            "opened_session": "2026-09-24",
+            "stop_price": 80,
+            "cost_basis_gross": 800 if manual_residual else 1000,
+        },
+        "005930",
+    )
+    old, new = signal("005930"), signal("000660")
+    old["technical"].update(relative63=0, sma120_slope5=1)
+    new["technical"].update(relative63=100, sma120_slope5=1)
+    watch(runtime, [old, new])
+    first = runtime.auto_trade()
+    if manual_residual:
+        assert first["submitted"] == 0
+        assert runtime.broker.account()["positions"][0]["quantity"] == 10
+        return
+    assert first["submitted"] == 1
+    assert [o["side"] for o in runtime.store.all_orders()] == ["sell"]
+    # Reconstruct the runtime to ensure pair state, not an in-memory flag, drives resumption.
+    resumed = Runtime(runtime.workspace, runtime.store, runtime.broker)
+    assert resumed.auto_trade()["submitted"] == 1
+    assert {p["symbol"] for p in resumed.broker.account()["positions"]} == {"000660"}
+    assert resumed.auto_trade()["submitted"] == 0
+    assert resumed.store.documents("rotation_pair")[0]["status"] == "completed"
+
+
+def rotation_fixture(tmp_path):
+    runtime = setup_runtime(
+        tmp_path,
+        rules={"max_positions": 1, "rotation_enabled": True, "rotation_min_holding": 1},
+        positions=[{"symbol": "005930", "quantity": 10, "average_price": "100"}],
+        cash="9000",
+    )
+    runtime.store.put_document(
+        "allocation",
+        {
+            "position_id": "cycle-a",
+            "managed_quantity": 10,
+            "opened_session": "2026-09-24",
+            "stop_price": 80,
+            "cost_basis_gross": 1000,
+        },
+        "005930",
+    )
+    old, new = signal("005930"), signal("000660")
+    old["technical"].update(relative63=0, sma120_slope5=1)
+    new["technical"].update(relative63=100, sma120_slope5=1)
+    watch(runtime, [old, new])
+    return runtime, old, new
+
+
+def test_protective_intent_is_saved_even_while_every_share_is_reserved(tmp_path):
+    runtime, old, _ = rotation_fixture(tmp_path)
+    pending_order(runtime, "005930", "sell", 10, "110")
+    old["technical"]["sma"]["20"] = 99
+    watch(runtime, [old], entries=False)
+    assert runtime.auto_trade()["submitted"] == 0
+    intent = runtime.store.document("exit_intent", "cycle-a")
+    assert intent["kind"] == "full"
+    assert intent["remaining"] == 10
+    assert intent["status"] == "pending"
+
+
+def test_partial_rotation_keeps_slot_and_cancels_remainder_when_candidate_disappears(
+    tmp_path, monkeypatch
+):
+    runtime, old, _ = rotation_fixture(tmp_path)
+    fill = runtime.broker._fill
+    monkeypatch.setattr(
+        runtime.broker, "_fill", lambda con, order, qty, price: fill(con, order, 4, price)
+    )
+    assert runtime.auto_trade()["submitted"] == 1
+    monkeypatch.setattr(runtime.broker, "_fill", fill)
+    assert runtime.auto_trade()["submitted"] == 0
+    assert runtime.store.documents("rotation_pair")[0]["status"] == "exit_partial"
+    watch(runtime, [old], entries=False)
+    resumed = Runtime(runtime.workspace, runtime.store, runtime.broker)
+    assert resumed.auto_trade()["submitted"] == 0
+    assert resumed.store.documents("rotation_pair")[0]["status"] == "cancelled"
+    assert resumed.broker.account()["positions"][0]["quantity"] == 6
+    assert all(order["side"] == "sell" for order in resumed.store.all_orders())
+
+
+def test_unknown_rotation_sale_cannot_submit_a_dependent_purchase(tmp_path):
+    runtime, _, _ = rotation_fixture(tmp_path)
+    runtime.broker.timeout_after_accept = True
+    assert runtime.auto_trade()["submitted"] == 1
+    assert runtime.store.documents("rotation_pair")[0]["status"] == "reconcile_required"
+    assert all(order["side"] == "sell" for order in runtime.store.all_orders())
+
+
+def test_rotation_rechecks_the_new_quote_after_confirmed_sale(tmp_path, monkeypatch):
+    runtime, _, _ = rotation_fixture(tmp_path)
+    assert runtime.auto_trade()["submitted"] == 1
+    quote = runtime.workspace.market.quote
+    monkeypatch.setattr(
+        runtime.workspace.market,
+        "quote",
+        lambda symbol: (
+            Quote(symbol, Decimal("150"), runtime.workspace.clock.now(), "synthetic_demo")
+            if symbol == "000660"
+            else quote(symbol)
+        ),
+    )
+    assert runtime.auto_trade()["submitted"] == 0
+    assert runtime.store.documents("rotation_pair")[0]["status"] == "expired"
+    assert runtime.broker.account()["positions"] == []
 
 
 @pytest.mark.parametrize("condition", ["entries_disabled", "loss_limit", "entry_window_closed"])
