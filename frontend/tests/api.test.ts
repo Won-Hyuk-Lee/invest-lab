@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { ApiError, request, won } from "../src/api";
+import { api, ApiError, request, won } from "../src/api";
 it("preserves structured conflict actions and correlation IDs", async () => {
   vi.stubGlobal(
     "fetch",
@@ -39,4 +39,28 @@ it("does not show missing or invalid amounts as zero", () => {
   expect(won("")).toBe("—");
   expect(won(" ")).toBe("—");
   expect(won("0")).toBe("0");
+});
+it("does not send response metadata back in strict trading control requests", async () => {
+  const fetcher = vi.fn(async () => new Response("{}", { status: 200 }));
+  vi.stubGlobal("fetch", fetcher);
+  await api.tradingControl({
+    version: 2,
+    enabled: true,
+    allowed_symbols: ["005930"],
+    max_order_value: "100000",
+    max_position_pct: 20,
+    max_invested_pct: 50,
+    ...{ updated_at: "response-only" },
+  });
+  const options = (
+    fetcher.mock.calls[0] as unknown as [string, RequestInit]
+  )[1];
+  expect(JSON.parse(String(options.body))).toEqual({
+    expected_version: 2,
+    enabled: true,
+    allowed_symbols: ["005930"],
+    max_order_value: "100000",
+    max_position_pct: 20,
+    max_invested_pct: 50,
+  });
 });

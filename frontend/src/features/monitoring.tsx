@@ -101,7 +101,7 @@ export function OperationsPage() {
   return (
     <>
       <PageHeader title="운영 상태" eyebrow="OPERATIONS">
-        수집·분석·주문 대조와 작업 복구를 확인합니다. 신규 진입 중지는 기존 주문
+        주문·잔고 대조와 작업 복구를 확인합니다. 신규 진입 중지는 기존 주문
         취소나 전량 청산을 뜻하지 않습니다.
       </PageHeader>
       <section className="panel padded-panel">
@@ -172,15 +172,6 @@ export function OperationsPage() {
                     >
                       <option value="reconcile">주문·잔고 대조</option>
                       <option value="collect_market">시세·일봉 수집</option>
-                      <option value="analyze">확정 일봉 분석</option>
-                      <option value="daily_pipeline">일별 작업 실행</option>
-                      <option value="collect_source">외부 원천 수집</option>
-                      <option value="build_dataset">
-                        수집 자료로 연구 데이터셋 생성
-                      </option>
-                      <option value="auto_trade">
-                        자동 모의운용 판단 실행
-                      </option>
                       <option value="report">일별 보고 기록</option>
                       <option value="backup">백업</option>
                     </select>

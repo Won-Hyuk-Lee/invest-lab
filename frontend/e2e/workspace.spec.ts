@@ -119,6 +119,30 @@ async function fixture(page: Page) {
         readiness: [],
         server_time: "2026-09-27T00:00:00Z",
       });
+    if (path === "/api/trading")
+      return send({
+        mode: "local_simulation",
+        execution_only: true,
+        entries_enabled: true,
+        control: {
+          version: 1,
+          enabled: false,
+          allowed_symbols: [],
+          max_order_value: "100000",
+          max_position_pct: 20,
+          max_invested_pct: 50,
+        },
+        worker: null,
+        signals: [],
+      });
+    if (path === "/api/trading/instruments")
+      return send([
+        {
+          symbol: instrument.symbol,
+          name: instrument.name,
+          kind: instrument.kind,
+        },
+      ]);
     if (path === "/api/portfolio") {
       if (state.delayPortfolio)
         await new Promise<void>((resolve) => {
@@ -262,7 +286,7 @@ test("A08 waits for the account instead of claiming an empty cash-only account",
 }) => {
   const state = await fixture(page);
   state.delayPortfolio = true;
-  await page.goto("/");
+  await page.goto("/archive");
   await expect(
     page.getByText(
       "계좌를 조회하고 있습니다. 금액과 보유 상태는 조회 후 표시합니다.",

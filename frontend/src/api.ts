@@ -133,6 +133,21 @@ export type OrderPage = {
   total: number;
 };
 export type DataRecord = Record<string, unknown>;
+export type AgentSignal = Schema["AgentSignalInput"];
+export type AgentControl = Omit<
+  Schema["AgentControlInput"],
+  "expected_version"
+> & {
+  version: number;
+};
+export type TradingStatus = {
+  mode: "local_simulation" | "kis_paper" | "kis_live";
+  control: AgentControl;
+  entries_enabled: boolean;
+  execution_only: boolean;
+  worker: DataRecord | null;
+  signals: ManagedOrder[];
+};
 export type Research = Schema["ResearchResponse"] & {
   fundamentals?: DataRecord[];
   macro?: DataRecord[];
@@ -293,6 +308,30 @@ export const api = {
     request<DataRecord>("/operations/jobs", { kind, payload }),
   control: (entries_enabled: boolean) =>
     request<DataRecord>("/operations/control", { entries_enabled }),
+  trading: ({ signal }: QuerySignal = {}) =>
+    request<TradingStatus>("/trading", undefined, signal),
+  tradingInstruments: ({ signal }: QuerySignal = {}) =>
+    request<Pick<Instrument, "symbol" | "name" | "kind">[]>(
+      "/trading/instruments",
+      undefined,
+      signal,
+    ),
+  tradingControl: (value: AgentControl) => {
+    return request<AgentControl>("/trading/control", {
+      expected_version: value.version,
+      enabled: value.enabled,
+      allowed_symbols: value.allowed_symbols,
+      max_order_value: value.max_order_value,
+      max_position_pct: value.max_position_pct,
+      max_invested_pct: value.max_invested_pct,
+    });
+  },
+  previewSignal: (value: AgentSignal) =>
+    request<DataRecord>("/trading/signals/preview", value),
+  submitSignal: (value: AgentSignal) =>
+    request<ManagedOrder>("/trading/signals", value),
+  signalStatus: (id: string) =>
+    request<ManagedOrder>(`/trading/signals/${encodeURIComponent(id)}`),
   research: ({ signal }: QuerySignal = {}) =>
     request<Research>("/research", undefined, signal),
   importDataset: (payload: DataRecord) =>
@@ -356,6 +395,14 @@ export const kindLabels: Record<Kind, string> = {
   kospi: "코스피",
   etf_kr: "국내 ETF",
   etf_us: "미국 지수 ETF",
+};
+export const modeLabel = (mode?: string) => {
+  const labels: Record<string, string> = {
+    local_simulation: "로컬 시뮬레이션",
+    kis_paper: "한투 모의계좌",
+    kis_live: "한투 실전계좌",
+  };
+  return labels[mode ?? ""] ?? "확인 중";
 };
 export const tagLabels: Record<string, string> = {
   review: "검토 기준 충족",

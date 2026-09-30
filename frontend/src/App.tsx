@@ -28,6 +28,7 @@ import {
   tagLabels,
   won,
   reasonLabels,
+  modeLabel,
 } from "./api";
 import type { Bar, Detail, Kind, Row, Strategy } from "./api";
 import {
@@ -39,6 +40,7 @@ import {
 import { OrderTicket, OrdersPage, OrderDetailPage } from "./features/orders";
 import { ResearchPage } from "./features/research";
 import { DeploymentPanel } from "./features/deployment";
+import { TradingPage } from "./features/trading";
 import {
   OperationsPage,
   ReportsPage,
@@ -122,12 +124,11 @@ function DataNote() {
     <div className="data-note">
       <FlaskConical size={17} />
       <span>
-        <b>{data.mode === "kis_paper" ? "한투 모의계좌" : "로컬 시뮬레이션"}</b>{" "}
-        · {data.account_alias} ·{" "}
+        <b>{modeLabel(data.mode)}</b> · {data.account_alias} ·{" "}
         {data.mode === "local_simulation"
           ? "생성된 예제 시세와 로컬 장부입니다. 실제 증권사 시세가 아닙니다."
           : data.broker_connected
-            ? "모의 서버 연결 · 가격 시각과 계좌 대조 결과를 함께 확인하세요."
+            ? "증권사 연결 · 가격 시각과 계좌 대조 결과를 함께 확인하세요."
             : "증권사 연결을 확인해야 합니다."}
         {workspace.error && " · 연결 상태 갱신 실패"}
       </span>
@@ -146,7 +147,6 @@ export default function App() {
 function WorkspaceApp() {
   const workspace = useWorkspace();
   const client = useQueryClient();
-  const screener = useQuery({ queryKey: ["screener"], queryFn: api.screener });
   const [selected, setSelected] = useState<string | null>(null);
   const refresh = () => client.invalidateQueries();
   return (
@@ -158,68 +158,78 @@ function WorkspaceApp() {
           </span>
           <span>
             invest<span className="brand-light">-lab</span>
-            <small>PERSONAL RESEARCH WORKSPACE</small>
+            <small>LOCAL TRADING WORKSPACE</small>
           </span>
         </NavLink>
         <div className="nav-caption">WORKSPACE</div>
         <nav aria-label="주 메뉴">
           <NavLink to="/" end>
             <LayoutDashboard size={19} />
-            대시보드
-          </NavLink>
-          <NavLink to="/market">
-            <BarChart3 size={19} />
-            종목 탐색
-            <span className="nav-count">
-              {screener.data?.rows.length ?? "—"}
-            </span>
-          </NavLink>
-          <NavLink to="/strategies">
-            <SlidersHorizontal size={19} />
-            전략 관리
-          </NavLink>
-          <NavLink to="/watchlist">
-            <ListFilter size={19} />
-            후보 감시
+            로컬 매매
           </NavLink>
           <NavLink to="/orders">
             <Activity size={19} />
             주문·체결
           </NavLink>
-          <NavLink to="/research">
-            <FlaskConical size={19} />
-            연구실
-          </NavLink>
-          <NavLink to="/reports">
-            <BarChart3 size={19} />
-            성과 보고
-          </NavLink>
           <NavLink to="/operations">
             <CircleHelp size={19} />
             운영 상태
           </NavLink>
+          <details className="archive-navigation">
+            <summary>이전 연구 기록</summary>
+            <NavLink to="/archive">
+              <LayoutDashboard size={19} />
+              이전 대시보드
+            </NavLink>
+            <NavLink to="/market">
+              <BarChart3 size={19} />
+              종목 탐색
+            </NavLink>
+            <NavLink to="/strategies">
+              <SlidersHorizontal size={19} />
+              전략 관리
+            </NavLink>
+            <NavLink to="/watchlist">
+              <ListFilter size={19} />
+              후보 감시
+            </NavLink>
+            <NavLink to="/research">
+              <FlaskConical size={19} />
+              연구실
+            </NavLink>
+            <NavLink to="/reports">
+              <BarChart3 size={19} />
+              성과 보고
+            </NavLink>
+          </details>
         </nav>
         <div className="sidebar-card">
           <span className="tiny-label">현재 실행 환경</span>
           <strong>
             <i className="status-dot" />
-            {workspace.data?.mode === "kis_paper"
-              ? "KIS PAPER"
-              : workspace.data
-                ? "LOCAL SIMULATION"
-                : "확인 중"}
+            {workspace.data?.mode === "kis_live"
+              ? "KIS LIVE"
+              : workspace.data?.mode === "kis_paper"
+                ? "KIS PAPER"
+                : workspace.data
+                  ? "LOCAL SIMULATION"
+                  : "확인 중"}
           </strong>
           <p>
-            내 PC에서 전략을 검증하고
+            내 PC에서 외부 판단을 연결하고
             <br />
-            판단의 근거를 기록합니다.
+            주문과 체결을 관리합니다.
           </p>
-          <span className="version-label">실전 주문 연결 없음</span>
+          <span className="version-label">
+            {workspace.data?.mode === "kis_live"
+              ? `실전 계좌 · 주문 ${workspace.data.live_orders_enabled ? "허용" : "중지"}`
+              : "모의/샘플 계좌"}
+          </span>
         </div>
         <div className="sidebar-bottom">
           <div className="avatar">WH</div>
           <div>
-            Won-Hyuk-Lee<small>개인 투자 연구실</small>
+            Won-Hyuk-Lee<small>로컬 매매 도구</small>
           </div>
         </div>
       </aside>
@@ -232,7 +242,7 @@ function WorkspaceApp() {
           <div className="topbar-right">
             <span className="local-label">
               <i className="status-dot" />
-              {workspace.data?.mode === "kis_paper" ? "한투 모의" : "로컬"}
+              {modeLabel(workspace.data?.mode)}
             </span>
             <button
               className="icon-button"
@@ -247,7 +257,11 @@ function WorkspaceApp() {
         <main>
           <DataNote />
           <Routes>
-            <Route path="/" element={<Dashboard onSelect={setSelected} />} />
+            <Route path="/" element={<TradingPage />} />
+            <Route
+              path="/archive"
+              element={<Dashboard onSelect={setSelected} />}
+            />
             <Route path="/market" element={<Market onSelect={setSelected} />} />
             <Route path="/strategies" element={<Strategies />} />
             <Route
@@ -265,9 +279,10 @@ function WorkspaceApp() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <footer className="page-footer">
-            <span>INVEST-LAB / RESEARCH FIRST</span>
+            <span>INVEST-LAB / LOCAL TRADING</span>
             <span>
-              모든 기간은 거래일 기준 · 매수 검토 점수는 수익 확률이 아닙니다.
+              외부 판단과 주문 실행을 구분하며 주문·체결 기록을 로컬에
+              보관합니다.
             </span>
           </footer>
         </main>

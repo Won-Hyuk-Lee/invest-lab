@@ -172,9 +172,11 @@ export function OrderTicket({
   return (
     <section className="order-ticket" aria-label={`${symbol} 주문 입력`}>
       <h3>
-        {workspace.data?.mode === "kis_paper"
-          ? "한투 모의 주문"
-          : "로컬 모의 주문"}
+        {workspace.data?.mode === "kis_live"
+          ? "한투 실전 주문"
+          : workspace.data?.mode === "kis_paper"
+            ? "한투 모의 주문"
+            : "로컬 모의 주문"}
       </h3>
       <p className="form-note">
         주문 내용을 등록한 뒤 전송합니다. 접수와 체결은 별도로 확인합니다.
