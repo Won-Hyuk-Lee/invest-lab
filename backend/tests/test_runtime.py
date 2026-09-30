@@ -11,6 +11,8 @@ from invest_lab.worker import Worker
 @pytest.fixture
 def runtime(workspace, tmp_path, monkeypatch):
     monkeypatch.delenv("INVEST_STATE_DIR", raising=False)
+    # These tests exercise the archived research workspace, not the new default gateway.
+    monkeypatch.setenv("INVEST_WORKSPACE", "research")
     return build_runtime(workspace, root=tmp_path, mode="local_simulation")
 
 

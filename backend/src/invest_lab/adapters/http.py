@@ -16,6 +16,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from invest_lab.adapters.api_models import (
     AccountResponse,
+    AgentControlInput,
+    AgentSignalInput,
     AmendInput,
     CancelInput,
     ContextResponse,
@@ -230,6 +232,39 @@ def create_app(workspace: Workspace | None = None, runtime=None) -> FastAPI:
             raise HTTPException(422, str(error)) from error
 
     if runtime:
+
+        @app.get("/api/trading", response_model=dict)
+        def trading_status():
+            return {**runtime.agent.status(), "execution_only": runtime.execution_only}
+
+        @app.post("/api/trading/control", response_model=dict)
+        def trading_control(body: AgentControlInput):
+            return runtime.agent.configure(body.model_dump())
+
+        @app.get("/api/trading/instruments", response_model=list[dict])
+        def trading_instruments():
+            return [
+                {"symbol": item.symbol, "name": item.name, "kind": item.kind}
+                for item in runtime.execution.instruments()
+            ]
+
+        @app.get("/api/trading/quotes/{symbol}", response_model=dict)
+        def trading_quote(symbol: str):
+            if symbol not in {i.symbol for i in runtime.execution.instruments()}:
+                raise LookupError("종목 마스터에서 확인되지 않은 종목입니다.")
+            return runtime.execution._quote(symbol)
+
+        @app.post("/api/trading/signals/preview", response_model=dict)
+        def preview_signal(body: AgentSignalInput):
+            return runtime.agent.preview(body.model_dump(mode="json"))
+
+        @app.post("/api/trading/signals", status_code=202, response_model=OrderResponse)
+        def agent_signal(body: AgentSignalInput):
+            return runtime.agent.submit(body.model_dump(mode="json"))
+
+        @app.get("/api/trading/signals/{client_id}", response_model=OrderResponse)
+        def agent_signal_status(client_id: UUID):
+            return runtime.agent.find(str(client_id))
 
         @app.get("/api/context", response_model=ContextResponse)
         def context():

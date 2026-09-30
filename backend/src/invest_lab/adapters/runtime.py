@@ -64,19 +64,21 @@ class Runtime:
         market_store=None,
         ingestion=None,
         root=None,
+        execution_only=False,
     ):
         self.workspace, self.store, self.broker = workspace, store, broker
         self.research, self.settings, self.config_error = research, settings, config_error
         self.market_store, self.ingestion = market_store, ingestion
         self.root = Path(root) if root else store.path.parent.parent
+        self.execution_only = execution_only
         self.execution = ExecutionService(
             store,
             broker,
             workspace.clock,
             instruments=workspace.market.instruments,
-            session_check=self._session_open if store.mode == "kis_paper" else None,
+            session_check=self._session_open if store.mode != "local_simulation" else None,
             strategy=workspace.strategies.latest,
-            preflight=self._broker_preflight if store.mode == "kis_paper" else None,
+            preflight=self._broker_preflight if store.mode != "local_simulation" else None,
             realtime_quote=self._realtime_quote if store.mode == "kis_paper" else None,
         )
         if store.document("control") is None:
@@ -100,7 +102,14 @@ class Runtime:
                     "updated_at": self.at(),
                 },
             )
-        if store.mode == "local_simulation" and store.document("screen") is None:
+        from invest_lab.application.agent_trading import AgentTradingService
+
+        self.agent = AgentTradingService(self.execution, store, workspace.clock, self.queue_submit)
+        if (
+            not self.execution_only
+            and store.mode == "local_simulation"
+            and store.document("screen") is None
+        ):
             self.analyze_market()
 
     def at(self):
@@ -108,12 +117,12 @@ class Runtime:
 
     def _broker_preflight(self):
         if not self.settings:
-            raise TradingBlocked("한투 모의 설정을 확인하세요.")
+            raise TradingBlocked("선택한 한투 계좌 설정을 확인하세요.")
         try:
             self.settings.require(account=True, orders=True)
         except ValueError:
             raise TradingBlocked(
-                "모의 키/계좌 설정과 KIS_PAPER_ORDERS_ENABLED를 확인하세요."
+                "선택 모드의 키/계좌 및 ORDERS_ENABLED 설정을 확인하세요."
             ) from None
 
     def _session_open(self, at):
@@ -167,11 +176,13 @@ class Runtime:
             },
             {
                 "name": "broker",
-                "ready": account_fresh if self.store.mode == "kis_paper" else True,
-                "message": "한투 모의 조회 결과" if self.store.mode == "kis_paper" else "샘플 계좌",
+                "ready": account_fresh if self.store.mode != "local_simulation" else True,
+                "message": "한투 계좌 조회 결과"
+                if self.store.mode != "local_simulation"
+                else "샘플 계좌",
             },
         ]
-        if self.store.mode == "kis_paper":
+        if self.store.mode != "local_simulation":
             readiness += [
                 {
                     "name": "credentials",
@@ -192,11 +203,14 @@ class Runtime:
         return {
             "mode": self.store.mode,
             "account_id": self.store.account_id,
-            "account_alias": "한투 모의계좌"
-            if self.store.mode == "kis_paper"
-            else "로컬 샘플 계좌",
-            "broker_connected": self.store.mode == "kis_paper" and account_fresh,
-            "live_orders_enabled": False,
+            "account_alias": {
+                "kis_paper": "한투 모의계좌",
+                "kis_live": "한투 실전계좌",
+                "local_simulation": "로컬 샘플 계좌",
+            }[self.store.mode],
+            "broker_connected": self.store.mode != "local_simulation" and account_fresh,
+            "live_orders_enabled": self.store.mode == "kis_live"
+            and bool(self.settings and self.settings.orders_enabled),
             "entries_enabled": self.store.document("control")["entries_enabled"],
             "readiness": readiness,
             "server_time": self.at(),
@@ -211,7 +225,7 @@ class Runtime:
             value = self.store.document("account")
             if value is None:
                 raise TradingBlocked(
-                    "모의계좌 조회 결과가 없습니다. 작업자에서 계좌 대조를 실행하세요."
+                    "계좌 조회 결과가 없습니다. 작업자에서 계좌 대조를 실행하세요."
                 )
         baseline = self.store.document("baseline") or {}
         names = {i.symbol: i.name for i in self.workspace.market.instruments()}
@@ -310,6 +324,10 @@ class Runtime:
         return self.store.document("control")
 
     def save_deployment(self, payload):
+        if self.execution_only and payload.get("enabled"):
+            raise TradingBlocked(
+                "로컬 매매 도구에서는 기존 연구 전략 자동 운용을 사용하지 않습니다."
+            )
         old = self.store.document("deployment")
         if payload["expected_version"] != old["version"]:
             raise VersionConflict(
@@ -538,7 +556,7 @@ class Runtime:
 
     def report(self):
         account = self.account()
-        if self.store.mode == "kis_paper":
+        if self.store.mode != "local_simulation":
             self.execution._fresh(account.get("observed_at"), "보고 계좌")
         session = self.workspace.clock.now().astimezone(KST).date().isoformat()
         orders = [o for o in self.store.all_orders() if o.get("trading_date") == session]
@@ -703,6 +721,19 @@ class Runtime:
 
     def run_job(self, job):
         kind, payload = job["kind"], job["payload"]
+        if self.execution_only and kind in {
+            "auto_trade",
+            "daily_pipeline",
+            "daily_finalize",
+            "analyze",
+            "research_experiment",
+            "create_demo_dataset",
+            "collect_source",
+            "build_dataset",
+        }:
+            raise TradingBlocked(
+                "연구 작업은 보관 기능입니다. 기본 작업자는 매매 실행만 처리합니다."
+            )
         if kind == "submit_order":
             result = self.execution.submit(payload["order_id"])
             self.store.enqueue("reconcile", job_key=f"reconcile:{job['id']}")
@@ -854,7 +885,7 @@ class Runtime:
         return {
             "history": result,
             "quotes": len(quotes),
-            "source": "kis_paper",
+            "source": self.store.mode,
             "checkpoint": checkpoint,
         }
 
@@ -924,6 +955,8 @@ class Runtime:
             provider.close()
 
     def auto_trade(self):
+        if self.execution_only:
+            return {"submitted": 0, "reason": "execution_workspace"}
         deployment = self.store.document("deployment")
         if not deployment["enabled"]:
             return {"submitted": 0, "reason": "자동 운용 비활성"}
@@ -1312,27 +1345,33 @@ def build_runtime(workspace, *, root: Path, mode=None, db_path=None):
     from invest_lab.adapters.research import build_research_service
 
     mode = mode or os.getenv("INVEST_MODE", "local_simulation")
+    profile = os.getenv("INVEST_WORKSPACE", "execution")
+    if profile not in {"execution", "research"}:
+        raise ValueError("INVEST_WORKSPACE는 execution 또는 research입니다.")
+    if mode == "kis_live" and profile != "execution":
+        raise ValueError("실전계좌는 외부 판단 실행 프로필에서만 지원합니다.")
     state_dir = Path(os.getenv("INVEST_STATE_DIR", str(root / ".local")))
     path = Path(db_path) if db_path else state_dir / f"runtime-{mode}.db"
     settings, error, market_store, ingestion = None, None, None, None
-    if mode == "kis_paper":
-        from invest_lab.adapters.kis import KisPaperClient
+    if mode in {"kis_paper", "kis_live"}:
+        from invest_lab.adapters.kis import KisLiveClient, KisPaperClient
         from invest_lab.adapters.settings import KisSettings, SettingsError
 
         try:
-            settings = KisSettings.from_env_file(root / ".env")
+            settings = KisSettings.from_env_file(root / ".env", mode=mode)
         except SettingsError:
             error = "설정 형식을 확인하세요. 비밀값은 화면에 표시하지 않습니다."
-            settings = KisSettings.from_mapping({}, root=root)
+            settings = KisSettings.from_mapping({}, root=root, mode=mode)
         account_id = hashlib.sha256(
             (settings.account_number + settings.account_product_code).encode()
         ).hexdigest()[:12]
         store = RuntimeStore(path, mode, account_id)
-        broker = KisPaperClient(settings)
+        broker = (KisLiveClient if mode == "kis_live" else KisPaperClient)(settings)
         from invest_lab.adapters.market_data import CachedMarket, MarketIngestion, MarketStore
 
         market_store = MarketStore(state_dir / "market.db")
         workspace.market = CachedMarket(market_store, workspace.clock)
+        workspace.market.source = mode + "_cache"
         ingestion = MarketIngestion(broker, market_store, workspace.clock)
     else:
         store = RuntimeStore(path, mode)
@@ -1350,4 +1389,5 @@ def build_runtime(workspace, *, root: Path, mode=None, db_path=None):
         market_store=market_store,
         ingestion=ingestion,
         root=root,
+        execution_only=profile == "execution",
     )

@@ -226,7 +226,31 @@ class ExecutionService:
         decimal(quote["price"], positive=True)
         return quote
 
+    def _agent_gate(self, order, price=None):
+        if order["context"].get("origin") != "agent":
+            return
+        policy = self.repo.document("agent_control") or {}
+        if not policy.get("enabled") or policy.get("version") != order["context"].get(
+            "agent_control_version"
+        ):
+            raise TradingBlocked("외부 판단 자동 주문이 중지되었거나 설정이 변경되었습니다.")
+        if order["symbol"] not in policy.get("allowed_symbols", []):
+            raise TradingBlocked("허용 목록에 없는 종목입니다.")
+        try:
+            expires = datetime.fromisoformat(order["context"]["expires_at"])
+            remaining = (expires - self.clock.now()).total_seconds()
+        except (ValueError, TypeError, KeyError):
+            raise TradingBlocked("외부 판단의 만료 시각을 확인하세요.") from None
+        if not 0 < remaining <= 300:
+            raise TradingBlocked("외부 판단이 만료되었습니다. 새 판단을 생성하세요.")
+        if price is not None and decimal(price) * order["quantity"] > decimal(
+            policy["max_order_value"]
+        ):
+            raise TradingBlocked("최신 가격에서 한 주문의 금액 한도를 초과합니다.")
+
     def _checks(self, order, *, amendment=False):
+        if not amendment:
+            self._agent_gate(order)
         if self.preflight:
             self.preflight()
         automatic = order["context"].get("origin") == "automatic"
@@ -321,7 +345,7 @@ class ExecutionService:
             own_price = decimal(order.get("submitted_price"), positive=True)
         if order["side"] == "buy":
             cap = self.broker.capacity(order["symbol"], str(price), order["order_type"])
-            if self.repo.mode == "kis_paper" or cap.get("observed_at"):
+            if self.repo.mode != "local_simulation" or cap.get("observed_at"):
                 self._fresh(cap.get("observed_at"), "매수 가능액")
             available = decimal(
                 cap.get("amount", cap.get("nrcvb_buy_amt", account.get("buying_power", "0")))
@@ -409,6 +433,17 @@ class ExecutionService:
             if automatic and self.repo.mode == "kis_paper":
                 self._fresh(quote["source_timestamp"], "최종 실시간 체결 시세", 60)
         self._fresh(account["observed_at"], "최종 계좌")
+        if not amendment:
+            agent_price = max(price, decimal(target["price"]))
+            if (
+                order["context"].get("origin") == "agent"
+                and order["order_type"] == "market"
+                and self.repo.mode != "local_simulation"
+            ):
+                if not target.get("upper_limit"):
+                    raise TradingBlocked("시장가 주문 한도 검사에 필요한 상한가가 없습니다.")
+                agent_price = max(agent_price, decimal(target["upper_limit"], positive=True))
+            self._agent_gate(order, agent_price)
         return {"account": account, "quotes": quotes, "equity": str(equity), "at": self.at()}, str(
             price
         )

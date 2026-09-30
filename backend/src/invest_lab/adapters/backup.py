@@ -67,7 +67,7 @@ def _inspect_database(path):
             if not isinstance(namespace, str) or ":" not in namespace:
                 raise ValueError("잘못된 운영 namespace입니다.")
             mode, account = namespace.split(":", 1)
-            if mode not in {"local_simulation", "kis_paper"} or not account:
+            if mode not in {"local_simulation", "kis_paper", "kis_live"} or not account:
                 raise ValueError("허용하지 않은 운영 mode/account namespace입니다.")
         if "execution_orders" in tables:
             for namespace, payload in connection.execute(
@@ -264,6 +264,12 @@ def _quarantine_runtime(path, *, bundle_hash):
                     },
                 )
                 deployment = document("deployment", {})
+                agent = document("agent_control", {})
+                if agent:
+                    put(
+                        "agent_control",
+                        {**agent, "enabled": False, "version": int(agent.get("version", 0)) + 1},
+                    )
                 put(
                     "deployment",
                     {

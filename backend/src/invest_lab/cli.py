@@ -1,4 +1,4 @@
-"""Local operator tools. Credentials stay in .env; no order submission command exists."""
+"""Local trading and operator tools. Credentials stay in .env."""
 
 import argparse
 import json
@@ -24,12 +24,17 @@ def parser():
     result = argparse.ArgumentParser(description="invest-lab local operations")
     result.add_argument(
         "--mode",
-        choices=["local_simulation", "kis_paper"],
+        choices=["local_simulation", "kis_paper", "kis_live"],
         default=os.getenv("INVEST_MODE", "local_simulation"),
     )
     sub = result.add_subparsers(dest="command", required=True)
     sub.add_parser("doctor")
+    sub.add_parser("trading-status")
+    for command in ("trading-control", "signal-preview", "signal-submit"):
+        sub.add_parser(command).add_argument("file", help="UTF-8 JSON file")
+    sub.add_parser("signal-status").add_argument("client_request_id")
     sub.add_parser("paper-read-check")
+    sub.add_parser("broker-read-check")
     master = sub.add_parser("master-download")
     master.add_argument("--classifications", help="Reviewed symbol -> kospi/etf_kr/etf_us JSON")
     market = sub.add_parser("import-market")
@@ -76,23 +81,43 @@ def parser():
 
 def execute(args):
     runtime = build_runtime(build_workspace(), root=ROOT, mode=args.mode)
+    if args.command == "trading-status":
+        return {**runtime.agent.status(), "execution_only": runtime.execution_only}
+    if args.command == "trading-control":
+        return runtime.agent.configure(read_json(args.file))
+    if args.command == "signal-preview":
+        return runtime.agent.preview(read_json(args.file))
+    if args.command == "signal-submit":
+        return runtime.agent.submit(read_json(args.file))
+    if args.command == "signal-status":
+        return runtime.agent.find(args.client_request_id)
     if args.command == "doctor":
         return {
             "context": runtime.context(),
-            "market": runtime.market_store.overview() if runtime.market_store else None,
+            "market": (
+                {**runtime.market_store.overview(), "source": runtime.workspace.market.source}
+                if runtime.market_store
+                else None
+            ),
             "source_keys": source_key_readiness(ROOT / ".env"),
             "orders_enabled": bool(runtime.settings and runtime.settings.orders_enabled),
-            "deployment": runtime.store.document("deployment"),
+            "execution_only": runtime.execution_only,
+            "agent_control": runtime.agent.status()["control"],
+            "deployment": (
+                runtime.store.document("deployment") if not runtime.execution_only else None
+            ),
             "secrets_displayed": False,
         }
-    if args.command == "paper-read-check":
-        if runtime.store.mode != "kis_paper":
-            raise ValueError("--mode kis_paper를 사용하세요.")
+    if args.command in {"paper-read-check", "broker-read-check"}:
+        if runtime.store.mode == "local_simulation" or (
+            args.command == "paper-read-check" and runtime.store.mode != "kis_paper"
+        ):
+            raise ValueError("선택한 명령에 맞는 --mode kis_paper 또는 kis_live를 사용하세요.")
         runtime.settings.require(account=True)
         quote = runtime.broker.quote("005930")
         result = runtime.execution.reconcile()
         return {
-            "mode": "kis_paper",
+            "mode": runtime.store.mode,
             "quote_read": bool(quote["price"]),
             "account_read": bool(runtime.store.document("account")),
             "reconciliation": result["status"],
@@ -104,7 +129,7 @@ def execute(args):
         args.command in {"master-download", "import-market", "build-dataset"}
         and not runtime.market_store
     ):
-        raise ValueError("실제 시장 저장소는 --mode kis_paper에서 사용하세요.")
+        raise ValueError("실제 시장 저장소는 --mode kis_paper 또는 kis_live에서 사용하세요.")
     if args.command == "master-download":
         from invest_lab.adapters.market_data import MarketMasterDownloader
 
