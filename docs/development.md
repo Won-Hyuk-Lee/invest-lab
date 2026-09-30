@@ -1,5 +1,9 @@
 # 개발 실행·검증·인계
 
+현재 변경의 확인 결과와 실전 미검증 범위는 [2026-09-30 전환 기록](local-trading-transition-2026-09-30.md)에 있다.
+
+**2026-09-30 전환:** 기본 `INVEST_WORKSPACE=execution`은 외부 판단 주문 큐·대조를 처리하고 기존 연구/내장 전략 자동 운용을 실행하지 않는다. 새 실행 흐름과 API/CLI 계약은 [로컬 매매 안내](local-trading.md), 과거 연구는 [보관 목록](research-archive.md)을 따른다. 아래 연구 인계 기록은 과거 상태이며 현재 제품 방향이 아니다.
+
 ETF 연구는 [종합 판단과 상세 결과 목록](research-conclusions-2026-09-29.md)을 먼저 읽는다. `etf_cli.py`, `auto_cli.py`, `selection_cli.py`는 국내 운용과 분리된 연구 진입점이다. 각 실행 안내에 원문 수집·오프라인 재현·자료 이전 절차가 있다. 원문과 전체 원장은 `.local/`, 공유용 보고서·JSON·그림은 `docs/`에 보관한다.
 
 국내 연구·운용 자료의 집 PC 이전은 [작업 인계서](handoff-2026-09-29.md)를 따른다. [미국 ETF 전략 논의](us-etf-strategy-discussion-2026-09-29.md)는 구현 전 기록이며 현재 후보 판단은 종합 문서를 우선한다.
