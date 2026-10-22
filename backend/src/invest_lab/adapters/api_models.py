@@ -64,7 +64,7 @@ class AccountResponse(Response):
     profit: str
     positions: list[Position]
     orders: list[dict[str, Any]]
-    mode: Literal["local_simulation", "kis_paper"]
+    mode: Literal["local_simulation", "kis_paper", "kis_live"]
     source: str
 
 
@@ -89,14 +89,37 @@ class Readiness(Response):
 
 
 class ContextResponse(Response):
-    mode: Literal["local_simulation", "kis_paper"]
+    mode: Literal["local_simulation", "kis_paper", "kis_live"]
     account_id: str
     account_alias: str
     broker_connected: bool
-    live_orders_enabled: Literal[False]
+    live_orders_enabled: bool
     entries_enabled: bool
     readiness: list[Readiness]
     server_time: str
+
+
+class AgentSignalInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    client_request_id: UUID
+    symbol: str = Field(pattern=r"^[A-Z0-9]{6}$")
+    side: Literal["buy", "sell"]
+    quantity: int = Field(strict=True, ge=1, le=100000)
+    order_type: Literal["limit", "market"] = "limit"
+    limit_price: str | None = None
+    source: str = Field(min_length=1, max_length=80)
+    reason: str = Field(min_length=1, max_length=1000)
+    expires_at: str
+
+
+class AgentControlInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    expected_version: int = Field(strict=True, ge=1)
+    enabled: bool = Field(strict=True)
+    allowed_symbols: list[str] = Field(max_length=50)
+    max_order_value: str
+    max_position_pct: float = Field(gt=0, le=100)
+    max_invested_pct: float = Field(gt=0, le=100)
 
 
 class OrderResponse(Response):
@@ -182,7 +205,7 @@ class HealthResponse(Response):
     mode: str
     source: str
     broker_connected: bool
-    live_orders_enabled: Literal[False]
+    live_orders_enabled: bool
 
 
 class StrictInput(BaseModel):

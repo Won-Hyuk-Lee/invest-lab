@@ -14,11 +14,17 @@ from invest_lab.application.execution import ExecutionService
 from invest_lab.domain.errors import TradingBlocked, VersionConflict
 from invest_lab.domain.indicators import analyze
 from invest_lab.domain.orders import TERMINAL, decimal
+from invest_lab.domain.portfolio_policy import (
+    holding_sessions,
+    pending_order_risk,
+    portfolio_risk,
+    risk_reductions,
+)
 from invest_lab.domain.research import latest_visible, macro_features
 from invest_lab.domain.strategies import (
     StrategyRules,
     evaluate_strategy,
-    size_position,
+    position_size_details,
     technical_features,
 )
 
@@ -58,19 +64,21 @@ class Runtime:
         market_store=None,
         ingestion=None,
         root=None,
+        execution_only=False,
     ):
         self.workspace, self.store, self.broker = workspace, store, broker
         self.research, self.settings, self.config_error = research, settings, config_error
         self.market_store, self.ingestion = market_store, ingestion
         self.root = Path(root) if root else store.path.parent.parent
+        self.execution_only = execution_only
         self.execution = ExecutionService(
             store,
             broker,
             workspace.clock,
             instruments=workspace.market.instruments,
-            session_check=self._session_open if store.mode == "kis_paper" else None,
+            session_check=self._session_open if store.mode != "local_simulation" else None,
             strategy=workspace.strategies.latest,
-            preflight=self._broker_preflight if store.mode == "kis_paper" else None,
+            preflight=self._broker_preflight if store.mode != "local_simulation" else None,
             realtime_quote=self._realtime_quote if store.mode == "kis_paper" else None,
         )
         if store.document("control") is None:
@@ -94,7 +102,14 @@ class Runtime:
                     "updated_at": self.at(),
                 },
             )
-        if store.mode == "local_simulation" and store.document("screen") is None:
+        from invest_lab.application.agent_trading import AgentTradingService
+
+        self.agent = AgentTradingService(self.execution, store, workspace.clock, self.queue_submit)
+        if (
+            not self.execution_only
+            and store.mode == "local_simulation"
+            and store.document("screen") is None
+        ):
             self.analyze_market()
 
     def at(self):
@@ -102,12 +117,12 @@ class Runtime:
 
     def _broker_preflight(self):
         if not self.settings:
-            raise TradingBlocked("한투 모의 설정을 확인하세요.")
+            raise TradingBlocked("선택한 한투 계좌 설정을 확인하세요.")
         try:
             self.settings.require(account=True, orders=True)
         except ValueError:
             raise TradingBlocked(
-                "모의 키/계좌 설정과 KIS_PAPER_ORDERS_ENABLED를 확인하세요."
+                "선택 모드의 키/계좌 및 ORDERS_ENABLED 설정을 확인하세요."
             ) from None
 
     def _session_open(self, at):
@@ -161,11 +176,13 @@ class Runtime:
             },
             {
                 "name": "broker",
-                "ready": account_fresh if self.store.mode == "kis_paper" else True,
-                "message": "한투 모의 조회 결과" if self.store.mode == "kis_paper" else "샘플 계좌",
+                "ready": account_fresh if self.store.mode != "local_simulation" else True,
+                "message": "한투 계좌 조회 결과"
+                if self.store.mode != "local_simulation"
+                else "샘플 계좌",
             },
         ]
-        if self.store.mode == "kis_paper":
+        if self.store.mode != "local_simulation":
             readiness += [
                 {
                     "name": "credentials",
@@ -186,11 +203,14 @@ class Runtime:
         return {
             "mode": self.store.mode,
             "account_id": self.store.account_id,
-            "account_alias": "한투 모의계좌"
-            if self.store.mode == "kis_paper"
-            else "로컬 샘플 계좌",
-            "broker_connected": self.store.mode == "kis_paper" and account_fresh,
-            "live_orders_enabled": False,
+            "account_alias": {
+                "kis_paper": "한투 모의계좌",
+                "kis_live": "한투 실전계좌",
+                "local_simulation": "로컬 샘플 계좌",
+            }[self.store.mode],
+            "broker_connected": self.store.mode != "local_simulation" and account_fresh,
+            "live_orders_enabled": self.store.mode == "kis_live"
+            and bool(self.settings and self.settings.orders_enabled),
             "entries_enabled": self.store.document("control")["entries_enabled"],
             "readiness": readiness,
             "server_time": self.at(),
@@ -205,7 +225,7 @@ class Runtime:
             value = self.store.document("account")
             if value is None:
                 raise TradingBlocked(
-                    "모의계좌 조회 결과가 없습니다. 작업자에서 계좌 대조를 실행하세요."
+                    "계좌 조회 결과가 없습니다. 작업자에서 계좌 대조를 실행하세요."
                 )
         baseline = self.store.document("baseline") or {}
         names = {i.symbol: i.name for i in self.workspace.market.instruments()}
@@ -304,6 +324,10 @@ class Runtime:
         return self.store.document("control")
 
     def save_deployment(self, payload):
+        if self.execution_only and payload.get("enabled"):
+            raise TradingBlocked(
+                "로컬 매매 도구에서는 기존 연구 전략 자동 운용을 사용하지 않습니다."
+            )
         old = self.store.document("deployment")
         if payload["expected_version"] != old["version"]:
             raise VersionConflict(
@@ -505,7 +529,7 @@ class Runtime:
                     signal["reasons"].append("model_filter_or_feature_coverage")
         eligible = sorted(
             [s for s in signals if s["eligible"]], key=lambda s: s.get("rank") or 0, reverse=True
-        )[:20]
+        )[: rules.candidate_limit]
         watch = {
             "items": eligible,
             "all_signals": signals,
@@ -532,7 +556,7 @@ class Runtime:
 
     def report(self):
         account = self.account()
-        if self.store.mode == "kis_paper":
+        if self.store.mode != "local_simulation":
             self.execution._fresh(account.get("observed_at"), "보고 계좌")
         session = self.workspace.clock.now().astimezone(KST).date().isoformat()
         orders = [o for o in self.store.all_orders() if o.get("trading_date") == session]
@@ -697,6 +721,19 @@ class Runtime:
 
     def run_job(self, job):
         kind, payload = job["kind"], job["payload"]
+        if self.execution_only and kind in {
+            "auto_trade",
+            "daily_pipeline",
+            "daily_finalize",
+            "analyze",
+            "research_experiment",
+            "create_demo_dataset",
+            "collect_source",
+            "build_dataset",
+        }:
+            raise TradingBlocked(
+                "연구 작업은 보관 기능입니다. 기본 작업자는 매매 실행만 처리합니다."
+            )
         if kind == "submit_order":
             result = self.execution.submit(payload["order_id"])
             self.store.enqueue("reconcile", job_key=f"reconcile:{job['id']}")
@@ -848,7 +885,7 @@ class Runtime:
         return {
             "history": result,
             "quotes": len(quotes),
-            "source": "kis_paper",
+            "source": self.store.mode,
             "checkpoint": checkpoint,
         }
 
@@ -918,6 +955,8 @@ class Runtime:
             provider.close()
 
     def auto_trade(self):
+        if self.execution_only:
+            return {"submitted": 0, "reason": "execution_workspace"}
         deployment = self.store.document("deployment")
         if not deployment["enabled"]:
             return {"submitted": 0, "reason": "자동 운용 비활성"}
@@ -968,7 +1007,48 @@ class Runtime:
         def active_orders():
             return [o for o in self.store.all_orders() if o["state"] not in TERMINAL]
 
-        def execute(signal, side, quantity, quote):
+        account_positions = {p["symbol"]: p for p in account["positions"]}
+        risk_positions = {
+            s: {
+                **(self.store.document("allocation", s) or {"managed_quantity": 0}),
+                "quantity": p["quantity"],
+                "index_group": indices.get(s),
+                "tradable": p["sellable_quantity"] > 0,
+            }
+            for s, p in account_positions.items()
+        }
+        reductions = risk_reductions(
+            risk_positions,
+            {
+                s: float(p["value"]) / p["quantity"]
+                for s, p in account_positions.items()
+                if p["quantity"]
+            },
+            {s: asdict(i) for s, i in instruments.items()},
+            rules,
+            equity=float(account["equity"]),
+        )
+        # Cancel confirmed automatic entry reservations before a risk reduction.
+        # Reconciliation, not the cancellation acknowledgement, releases a budget.
+        if loss_limit or reductions:
+            for order in active_orders():
+                if order["side"] != "buy" or order.get("context", {}).get("origin") != "automatic":
+                    continue
+                if order["state"] == "registered":
+                    self.store.transition(
+                        order["id"], {"registered"}, "expired", self.at(), error="risk_entry_halt"
+                    )
+                else:
+                    self.execution.cancel(
+                        order["id"],
+                        f"risk-cancel:{today}:{order['id']}",
+                        order["remaining_quantity"],
+                    )
+            if self.execution.reconcile()["status"] != "matched":
+                raise TradingBlocked("위험 축소 전 매수 취소 대조가 필요합니다.")
+            account = self.broker.account()
+
+        def execute(signal, side, quantity, quote, sizing=None):
             symbol = signal["symbol"]
             client_id = str(
                 uuid5(
@@ -989,7 +1069,15 @@ class Runtime:
                 "index_id": indices.get(symbol),
                 "index_map": indices,
                 "stop_price": float(quote["price"]) - (signal.get("stop_distance") or 0),
+                "initial_stop_distance": signal.get("stop_distance"),
+                "exit_kind": signal.get("exit_kind"),
+                "exit_intent_id": signal.get("exit_intent_id"),
+                "rotation_id": signal.get("rotation_id"),
                 "valid_session": today,
+                "execution_policy": "quote_observed_first_30_minutes"
+                if side == "buy"
+                else "quote_observed_managed_exit",
+                "sizing": sizing,
                 "risk_policy": {
                     "max_position_pct": rules.max_position_pct,
                     "max_invested_pct": rules.max_total_pct,
@@ -1029,55 +1117,151 @@ class Runtime:
             symbol = position["symbol"]
             allocation = self.store.document("allocation", symbol) or {}
             managed = min(allocation.get("managed_quantity", 0), position["sellable_quantity"])
-            if (
-                not managed
-                or symbol not in signals
-                or any(o["symbol"] == symbol for o in active_orders())
-            ):
+            if not allocation.get("managed_quantity", 0):
                 continue
-            opened = allocation.get("opened_session", today)
+            opened = allocation.get("opened_session")
+            if not opened:
+                skipped.append({"symbol": symbol, "reason": "관리 포지션 진입일 확인 필요"})
+                continue
+            signal = signals.get(symbol)
+            signal_session = signal["as_of"] if signal else watch["as_of"]
             if self.market_store:
-                holding_sessions = max(
-                    0, len(self.market_store.sessions(opened, today, as_of=now)) - 1
-                )
+                known_sessions = [
+                    r["session"] for r in self.market_store.sessions(opened, today, as_of=now)
+                ]
             else:
-                holding_sessions = sum(
-                    opened <= b.session.isoformat() <= today
-                    for b in self.workspace.market.history(symbol)
+                known_sessions = [
+                    b.session.isoformat() for b in self.workspace.market.history(symbol)
+                ]
+            age = holding_sessions(opened, signal_session, known_sessions)
+            lifecycle = allocation.get("position_id", symbol + ":" + opened)
+            assessment_key = f"{lifecycle}:{deployment['version']}:{signal_session}"
+            result = self.store.document("exit_assessment", assessment_key)
+            if result is None and signal:
+                result = evaluate_strategy(
+                    signal["technical"],
+                    asdict(instruments[symbol]),
+                    rules,
+                    position={
+                        **allocation,
+                        "quantity": allocation["managed_quantity"],
+                        "holding_sessions": age,
+                    },
                 )
-            signal = signals[symbol]
-            result = evaluate_strategy(
-                signal["technical"],
-                asdict(instruments[symbol]),
-                rules,
-                position={
-                    "stop_price": allocation.get("stop_price", 0),
-                    "holding_sessions": holding_sessions,
-                },
-            )
+                allocation.update(result.get("position_updates", {}))
+                self.store.put_document("allocation", allocation, symbol)
+                self.store.put_document("exit_assessment", result, assessment_key)
+            result = result or {"action": "hold", "reasons": []}
+            exit_key = lifecycle
+            intention = self.store.document("exit_intent", exit_key)
+            if intention:
+                filled = sum(
+                    o["filled_quantity"]
+                    for o in self.store.all_orders()
+                    if o.get("context", {}).get("exit_intent_id") == intention["id"]
+                )
+                intention["remaining"] = max(0, intention["quantity"] - filled)
+                intention["status"] = "completed" if intention["remaining"] == 0 else "pending"
+                self.store.put_document("exit_intent", intention, exit_key)
             quote = self.execution._quote(symbol, automatic=True)
             intraday_stop = rules.intraday_stop and float(quote["price"]) <= allocation.get(
                 "stop_price", 0
             )
-            if result["action"] == "sell" or intraday_stop:
-                if not execute(signal, "sell", managed, quote):
+            expire = age >= rules.max_holding_sessions + (
+                rules.holding_extension_sessions if allocation.get("trailing_active") else 0
+            )
+            reduction = reductions.get(symbol, 0)
+            trigger = result["action"] == "sell" or intraday_stop or expire or reduction > 0
+            hard = intraday_stop or expire or result.get("exit_kind") == "full"
+            if trigger and (
+                not intention
+                or (hard and intention.get("kind") != "full")
+                or (
+                    reduction
+                    and intention.get("remaining", 0) < reduction
+                    and intention.get("kind") != "full"
+                )
+                or (
+                    intention["status"] == "completed"
+                    and intention["signal_session"] != signal_session
+                )
+            ):
+                quantity = (
+                    allocation["managed_quantity"]
+                    if hard
+                    else min(
+                        allocation["managed_quantity"],
+                        max(reduction, result.get("exit_quantity", 0)),
+                    )
+                )
+                kind = (
+                    "full"
+                    if hard
+                    else "risk_reduction"
+                    if reduction
+                    else result.get("exit_kind", "full")
+                )
+                intention = {
+                    "id": f"{lifecycle}:{signal_session}:{kind}",
+                    "position_id": lifecycle,
+                    "symbol": symbol,
+                    "signal_session": signal_session,
+                    "kind": kind,
+                    "reasons": sorted(
+                        set(
+                            result["reasons"]
+                            + (["intraday_stop"] if intraday_stop else [])
+                            + (["holding_expiry"] if expire else [])
+                            + (["portfolio_risk_reduction"] if reduction else [])
+                        )
+                    ),
+                    "quantity": quantity,
+                    "remaining": quantity,
+                    "status": "pending",
+                }
+                self.store.put_document("exit_intent", intention, exit_key)
+            if intention and intention["status"] == "pending":
+                if any(o["symbol"] == symbol for o in active_orders()):
+                    continue
+                if not managed:
+                    skipped.append(
+                        {"symbol": symbol, "reason": "청산 의도 유지: 매도 가능 수량 없음"}
+                    )
+                    continue
+                exit_signal = {
+                    **(signal or {"symbol": symbol}),
+                    "exit_kind": intention["kind"],
+                    "exit_intent_id": intention["id"],
+                    "exit_reasons": intention["reasons"],
+                }
+                if not execute(exit_signal, "sell", min(managed, intention["remaining"]), quote):
                     return {
                         "submitted": len(submitted),
                         "orders": submitted,
                         "skipped": skipped,
                         "session": today,
                     }
-        if (
+        entries_allowed = (
             entry_window
             and not loss_limit
+            and not reductions
             and self.store.document("control").get("entries_enabled")
-        ):
-            for signal in watch["items"]:
+        )
+        entry_signals = watch["items"]
+        if rules.rotation_enabled or self.store.documents("rotation_pair"):
+            from invest_lab.adapters.rotation_execution import RotationCoordinator
+
+            entry_signals = RotationCoordinator(
+                self, rules, signals, instruments, today, watch["as_of"], execute
+            ).run(entry_signals, entries_allowed=entries_allowed)
+        if entries_allowed:
+            for signal in entry_signals:
                 symbol = signal["symbol"]
                 account = self.broker.account()
                 positions = {p["symbol"]: p for p in account["positions"]}
                 pending = [o for o in active_orders() if o["side"] == "buy"]
                 if symbol in positions or any(o["symbol"] == symbol for o in active_orders()):
+                    skipped.append({"symbol": symbol, "reason": "기존 보유 또는 진행 중 주문"})
                     continue
                 exposure = {s: float(p["value"]) for s, p in positions.items()}
                 for order in pending:
@@ -1103,7 +1287,7 @@ class Runtime:
                 index_value = sum(
                     v for s, v in exposure.items() if index_id and indices.get(s) == index_id
                 )
-                quantity = size_position(
+                sizing = position_size_details(
                     equity=float(account["equity"]),
                     cash=float(account.get("buying_power", account["cash"])),
                     price=price,
@@ -1112,9 +1296,40 @@ class Runtime:
                     sector_value=sector,
                     index_value=index_value,
                     volume20=signal["technical"].get("volume20"),
+                    open_risk=portfolio_risk(
+                        {
+                            s: {
+                                **(self.store.document("allocation", s) or {}),
+                                "quantity": p["quantity"],
+                            }
+                            for s, p in positions.items()
+                        },
+                        {
+                            s: float(p["value"]) / p["quantity"]
+                            for s, p in positions.items()
+                            if p["quantity"]
+                        },
+                        reserved=pending_order_risk(pending),
+                    ),
                     rules=rules,
                 )
-                if quantity and not execute(signal, "buy", quantity, quote):
+                quantity = sizing["quantity"]
+                observed_at = self.at()
+                self.store.put_document(
+                    "sizing_decisions",
+                    {
+                        "session": today,
+                        "symbol": symbol,
+                        "at": observed_at,
+                        "deployment_version": deployment["version"],
+                        "sizing": sizing,
+                        "execution_policy": "quote_observed_first_30_minutes",
+                    },
+                    f"{today}:{deployment['version']}:{symbol}:{observed_at}",
+                )
+                if not quantity:
+                    skipped.append({"symbol": symbol, "reason": "주문 수량 0", "sizing": sizing})
+                elif not execute(signal, "buy", quantity, quote, sizing):
                     break
         return {
             "submitted": len(submitted),
@@ -1130,27 +1345,33 @@ def build_runtime(workspace, *, root: Path, mode=None, db_path=None):
     from invest_lab.adapters.research import build_research_service
 
     mode = mode or os.getenv("INVEST_MODE", "local_simulation")
+    profile = os.getenv("INVEST_WORKSPACE", "execution")
+    if profile not in {"execution", "research"}:
+        raise ValueError("INVEST_WORKSPACE는 execution 또는 research입니다.")
+    if mode == "kis_live" and profile != "execution":
+        raise ValueError("실전계좌는 외부 판단 실행 프로필에서만 지원합니다.")
     state_dir = Path(os.getenv("INVEST_STATE_DIR", str(root / ".local")))
     path = Path(db_path) if db_path else state_dir / f"runtime-{mode}.db"
     settings, error, market_store, ingestion = None, None, None, None
-    if mode == "kis_paper":
-        from invest_lab.adapters.kis import KisPaperClient
+    if mode in {"kis_paper", "kis_live"}:
+        from invest_lab.adapters.kis import KisLiveClient, KisPaperClient
         from invest_lab.adapters.settings import KisSettings, SettingsError
 
         try:
-            settings = KisSettings.from_env_file(root / ".env")
+            settings = KisSettings.from_env_file(root / ".env", mode=mode)
         except SettingsError:
             error = "설정 형식을 확인하세요. 비밀값은 화면에 표시하지 않습니다."
-            settings = KisSettings.from_mapping({}, root=root)
+            settings = KisSettings.from_mapping({}, root=root, mode=mode)
         account_id = hashlib.sha256(
             (settings.account_number + settings.account_product_code).encode()
         ).hexdigest()[:12]
         store = RuntimeStore(path, mode, account_id)
-        broker = KisPaperClient(settings)
+        broker = (KisLiveClient if mode == "kis_live" else KisPaperClient)(settings)
         from invest_lab.adapters.market_data import CachedMarket, MarketIngestion, MarketStore
 
         market_store = MarketStore(state_dir / "market.db")
         workspace.market = CachedMarket(market_store, workspace.clock)
+        workspace.market.source = mode + "_cache"
         ingestion = MarketIngestion(broker, market_store, workspace.clock)
     else:
         store = RuntimeStore(path, mode)
@@ -1168,4 +1389,5 @@ def build_runtime(workspace, *, root: Path, mode=None, db_path=None):
         market_store=market_store,
         ingestion=ingestion,
         root=root,
+        execution_only=profile == "execution",
     )

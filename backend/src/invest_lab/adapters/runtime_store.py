@@ -50,8 +50,8 @@ class RuntimeStore:
     _guard = threading.Lock()
 
     def __init__(self, path: Path, mode="local_simulation", account_id="local"):
-        if mode not in {"local_simulation", "kis_paper"}:
-            raise ValueError("실전 실행은 지원하지 않습니다.")
+        if mode not in {"local_simulation", "kis_paper", "kis_live"}:
+            raise ValueError("지원하지 않는 실행 모드입니다.")
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.mode, self.account_id = mode, account_id

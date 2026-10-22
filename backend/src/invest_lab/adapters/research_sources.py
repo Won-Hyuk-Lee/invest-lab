@@ -185,9 +185,9 @@ class FredSource(OfficialSource):
         raise ResearchSourceError("fred: pagination_limit_exceeded")
 
 
-def safe_xml(content: bytes):
+def safe_xml(content: bytes, *, max_bytes: int = 20_000_000):
     if (
-        len(content) > 20_000_000
+        len(content) > max_bytes
         or b"\x00" in content
         or b"<!DOCTYPE" in content.upper()
         or b"<!ENTITY" in content.upper()
@@ -239,7 +239,9 @@ class DartSource(OfficialSource):
         )
         rows = []
         for content in documents.values():
-            for item in safe_xml(content).findall("list"):
+            # The official complete company directory exceeds 20 MB. Keep receipt
+            # documents at the smaller default and retain the archive's 50 MB cap.
+            for item in safe_xml(content, max_bytes=50_000_000).findall("list"):
                 row = {child.tag: child.text or "" for child in item}
                 if row.get("stock_code", "").strip():
                     rows.append(row)

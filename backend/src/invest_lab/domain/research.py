@@ -126,10 +126,22 @@ def validate_dataset(payload: dict) -> dict:
             if fingerprint in seen:
                 raise ValueError(f"{table}에 동일한 중복 행이 있습니다.")
             seen.add(fingerprint)
+    benchmark_row_ids = {id(row) for row in data["benchmarks"]}
     for row in data["bars"] + data["benchmarks"]:
-        values = [finite(row[k], positive=True) for k in ("open", "high", "low", "close")]
-        if values[2] > min(values[0], values[3]) or values[1] < max(values[0], values[3]):
-            raise ValueError("OHLC 범위가 맞지 않습니다.")
+        if row.get("valuation_only") is True:
+            if (
+                id(row) in benchmark_row_ids
+                or row.get("tradable") is not False
+                or finite(row["volume"], integer=True) != 0
+                or finite(row.get("turnover", 0)) != 0
+                or any(finite(row[k]) != 0 for k in ("open", "high", "low"))
+            ):
+                raise ValueError("평가 전용 봉은 거래 없는 종가 원문이어야 합니다.")
+            finite(row["close"], positive=True)
+        else:
+            values = [finite(row[k], positive=True) for k in ("open", "high", "low", "close")]
+            if values[2] > min(values[0], values[3]) or values[1] < max(values[0], values[3]):
+                raise ValueError("OHLC 범위가 맞지 않습니다.")
         finite(row["volume"], integer=True)
         if finite(row.get("turnover", 0)) < 0:
             raise ValueError("거래대금은 음수가 될 수 없습니다.")
@@ -146,6 +158,15 @@ def validate_dataset(payload: dict) -> dict:
             raise ValueError("유니버스 종목 목록이 올바르지 않습니다.")
         if set(row["symbols"]) - set(instruments):
             raise ValueError("유니버스에 마스터 미등록 종목이 있습니다.")
+        if "listed_symbols" in row:
+            listed = row["listed_symbols"]
+            if (
+                not isinstance(listed, list)
+                or len(listed) != len(set(listed))
+                or set(listed) - set(instruments)
+                or set(row["symbols"]) - set(listed)
+            ):
+                raise ValueError("독립 상장 명단과 매매 유니버스가 맞지 않습니다.")
     for action in data["actions"]:
         if not isinstance(action.get("event_id"), str) or not action["event_id"]:
             raise ValueError("기업행동 event_id가 필요합니다.")
@@ -154,6 +175,28 @@ def validate_dataset(payload: dict) -> dict:
         date.fromisoformat(action["effective_date"])
         if action["type"] == "split":
             finite(action["ratio"], positive=True)
+            basis = action.get("price_basis_date", action["effective_date"])
+            date.fromisoformat(basis)
+            if basis < action["effective_date"]:
+                raise ValueError("가격 기준일이 주식 권리 효력일보다 빠릅니다.")
+            if action.get("fractional_policy") is not None:
+                if action["fractional_policy"] not in {
+                    "cash_at_close",
+                    "sale_proceeds_unconfirmed",
+                    "cancel_without_compensation",
+                }:
+                    raise ValueError("지원하지 않는 단주 처리 정책입니다.")
+                if action["fractional_policy"] == "cash_at_close":
+                    date.fromisoformat(action["fractional_price_date"])
+                    if action["fractional_price_date"] < basis:
+                        raise ValueError("단주 가격 결정일이 가격 기준일보다 빠릅니다.")
+                if action.get("payment_date"):
+                    date.fromisoformat(action["payment_date"])
+                    if (
+                        not action.get("fractional_price_date")
+                        or action["payment_date"] < action["fractional_price_date"]
+                    ):
+                        raise ValueError("단주 지급일이 가격 결정일보다 빠릅니다.")
         elif action["type"] in {"dividend", "distribution"}:
             if finite(action["amount"]) < 0:
                 raise ValueError("배당금은 음수가 될 수 없습니다.")
@@ -192,7 +235,10 @@ def coverage(data: dict) -> dict:
         if item is None:
             missing_universe.append(session)
         else:
-            expected.update((symbol, session) for symbol in item["symbols"])
+            # The denominator must survive missing/invalid OHLC normalization.
+            expected.update(
+                (symbol, session) for symbol in item.get("listed_symbols", item["symbols"])
+            )
     missing_bars = sorted(expected - raw)
     if missing_universe:
         issues.append("missing_historical_universe")
@@ -238,6 +284,9 @@ def coverage(data: dict) -> dict:
         "sessions": len(sessions),
         "instruments": len(data["instruments"]),
         "expected_bars": len(expected),
+        "denominator": "independent_listed_symbols"
+        if all("listed_symbols" in row for row in universe.values())
+        else "declared_universe_only",
         "raw_bars": len(raw),
         "missing_bar_count": len(missing_bars),
         "missing_bars": missing_bars[:100],
@@ -280,7 +329,7 @@ def bars_at(data: dict, symbol: str, session: str, at: datetime, *, observed_by=
             for a in actions
             if a["symbol"] == symbol
             and a["type"] == "split"
-            and bar["session"] < a["effective_date"] <= session
+            and bar["session"] < a.get("price_basis_date", a["effective_date"]) <= session
         )
         adjusted.append(
             {

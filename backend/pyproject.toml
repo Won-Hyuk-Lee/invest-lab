@@ -1,7 +1,7 @@
 [project]
 name = "invest-lab"
 version = "0.1.0"
-description = "Local research workspace for KOSPI stocks and Korea-listed ETFs"
+description = "Local trading gateway for AI agents and external decision scripts"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1",
@@ -14,6 +14,7 @@ dependencies = [
   "pyarrow>=19,<24",
   "websockets>=14,<17",
   "cryptography>=44,<50",
+  "xlrd>=2,<3",
 ]
 
 [dependency-groups]

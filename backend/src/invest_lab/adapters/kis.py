@@ -1,4 +1,4 @@
-"""KIS paper REST boundary; every network operation is explicit and injectable."""
+"""KIS domestic REST boundary; network operations are explicit and injectable."""
 
 import hashlib
 import re
@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from invest_lab.adapters.settings import PAPER_BASE_URL, KisSettings
+from invest_lab.adapters.settings import KisSettings
 from invest_lab.domain.errors import TradingBlocked
 
 KST = ZoneInfo("Asia/Seoul")
@@ -191,7 +191,7 @@ class KisCoordinator:
         raise KisError("TOKEN_ISSUE_BUSY", retryable=True)
 
 
-class KisPaperClient:
+class KisClient:
     source = "kis_paper"
     capabilities = {
         "quote": True,
@@ -223,6 +223,7 @@ class KisPaperClient:
         max_pages=1000,
     ):
         self.settings = settings
+        self.source = settings.mode
         self.now = now or (lambda: datetime.now(timezone.utc))
         self.sleep = sleep
         self.max_pages = max_pages
@@ -235,11 +236,13 @@ class KisPaperClient:
         self._owns_http = http_client is None
         # Account is the shared throttle scope; a different app key cannot bypass it.
         identity = settings.account_number or settings.app_key
-        self._rate_scope = hashlib.sha256(("paper:" + identity).encode()).hexdigest()
-        self._token_scope = hashlib.sha256((PAPER_BASE_URL + settings.app_key).encode()).hexdigest()
+        self._rate_scope = hashlib.sha256((settings.mode + ":" + identity).encode()).hexdigest()
+        self._token_scope = hashlib.sha256(
+            (settings.base_url + settings.app_key).encode()
+        ).hexdigest()
 
     def __repr__(self):
-        return "KisPaperClient(mode='kis_paper')"
+        return f"{type(self).__name__}(mode={self.settings.mode!r})"
 
     def close(self):
         if self._owns_http:
@@ -256,7 +259,7 @@ class KisPaperClient:
         self.coordinator.wait(self._rate_scope)
         try:
             response = self._http.post(
-                PAPER_BASE_URL + "/oauth2/tokenP",
+                self.settings.base_url + "/oauth2/tokenP",
                 follow_redirects=False,
                 json={
                     "grant_type": "client_credentials",
@@ -287,6 +290,11 @@ class KisPaperClient:
             raise KisError("TOKEN_ISSUE_FAILED", retryable=True) from None
 
     def _request(self, path, tr_id, params, *, post=False, continuation=""):
+        if self.settings.mode == "kis_live":
+            if tr_id.startswith("VTTC"):
+                tr_id = "TTTC" + tr_id[4:]
+            elif tr_id.startswith("VTSC"):
+                tr_id = "CTSC" + tr_id[4:]
         self.settings.require()
         token = self.coordinator.token(self._token_scope, self._issue_token)
         attempts = 1 if post else 3
@@ -304,11 +312,14 @@ class KisPaperClient:
             try:
                 if post:
                     response = self._http.post(
-                        PAPER_BASE_URL + path, headers=headers, json=params, follow_redirects=False
+                        self.settings.base_url + path,
+                        headers=headers,
+                        json=params,
+                        follow_redirects=False,
                     )
                 else:
                     response = self._http.get(
-                        PAPER_BASE_URL + path,
+                        self.settings.base_url + path,
                         headers=headers,
                         params=params,
                         follow_redirects=False,
@@ -573,7 +584,7 @@ class KisPaperClient:
             "positions": list(positions.values()),
             "observed_at": balance_observed_at,
             "source": self.source,
-            "mode": "kis_paper",
+            "mode": self.settings.mode,
             "buying_power_observed_at": buying["observed_at"],
             "snapshot_completed_at": self.now().isoformat(),
             "timestamp_basis": "received",
@@ -762,7 +773,7 @@ class KisPaperClient:
         self.coordinator.wait(self._rate_scope)
         try:
             response = self._http.post(
-                PAPER_BASE_URL + "/oauth2/Approval",
+                self.settings.base_url + "/oauth2/Approval",
                 follow_redirects=False,
                 json={
                     "grant_type": "client_credentials",
@@ -777,3 +788,17 @@ class KisPaperClient:
             return key
         except (httpx.HTTPError, ValueError, AttributeError):
             raise KisError("WS_APPROVAL_FAILED") from None
+
+
+class KisPaperClient(KisClient):
+    def __init__(self, settings, **kwargs):
+        if settings.mode != "kis_paper":
+            raise ValueError("Paper client requires paper settings.")
+        super().__init__(settings, **kwargs)
+
+
+class KisLiveClient(KisClient):
+    def __init__(self, settings, **kwargs):
+        if settings.mode != "kis_live":
+            raise ValueError("Live client requires live settings.")
+        super().__init__(settings, **kwargs)

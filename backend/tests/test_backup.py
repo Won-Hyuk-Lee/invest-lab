@@ -15,11 +15,12 @@ from invest_lab.application.research import synthetic_research_dataset
 from invest_lab.domain.research import canonical, content_hash
 
 
-def backup_fixture(tmp_path):
+def backup_fixture(tmp_path, mode="kis_paper"):
     state = tmp_path / "state"
-    store = RuntimeStore(state / "runtime-kis_paper.db", "kis_paper", "account-hash")
+    store = RuntimeStore(state / f"runtime-{mode}.db", mode, "account-hash")
     store.put_document("control", {"entries_enabled": True})
     store.put_document("deployment", {"enabled": True, "version": 3})
+    store.put_document("agent_control", {"enabled": True, "version": 2})
     store.put_document("reconciliation", {"status": "matched"})
     store.put_document("stream", {"connected": True, "reconciled": True})
     request = {
@@ -36,15 +37,16 @@ def backup_fixture(tmp_path):
     dataset = research.import_dataset(synthetic_research_dataset(5))
     market = MarketStore(state / "market.db")
     paths = {
-        "runtime-kis_paper": store.path,
+        f"runtime-{mode}": store.path,
         "research": research.repository.path,
         "market": market.path,
     }
     return store, research, dataset, paths, order
 
 
-def test_bundle_restores_all_stores_and_quarantines_even_registered_intents(tmp_path):
-    store, research, dataset, paths, order = backup_fixture(tmp_path)
+@pytest.mark.parametrize("mode", ["kis_paper", "kis_live"])
+def test_bundle_restores_all_stores_and_quarantines_even_registered_intents(tmp_path, mode):
+    store, research, dataset, paths, order = backup_fixture(tmp_path, mode)
     result = create_backup_bundle(
         tmp_path / "bundle",
         databases=paths,
@@ -55,12 +57,12 @@ def test_bundle_restores_all_stores_and_quarantines_even_registered_intents(tmp_
     receipt = restore_backup_bundle(
         tmp_path / "bundle", tmp_path / "restored", expected_namespace=store.namespace
     )
-    restored = RuntimeStore(
-        Path(receipt["databases"]["runtime-kis_paper"]), "kis_paper", "account-hash"
-    )
+    restored = RuntimeStore(Path(receipt["databases"][f"runtime-{mode}"]), mode, "account-hash")
     assert restored.document("control")["entries_enabled"] is False
     assert restored.document("deployment")["enabled"] is False
     assert restored.document("deployment")["version"] == 4
+    assert restored.document("agent_control")["enabled"] is False
+    assert restored.document("agent_control")["version"] == 3
     assert restored.document("restore")["status"] == "needs_reconciliation"
     assert restored.document("reconciliation")["status"] == "mismatch"
     assert restored.get_order(order["id"])["state"] == "unknown"
@@ -76,6 +78,7 @@ def test_bundle_restores_all_stores_and_quarantines_even_registered_intents(tmp_
     # Original state and already-verified bundle are never rewritten by restore.
     assert store.get_order(order["id"])["state"] == "registered"
     assert store.document("control")["entries_enabled"] is True
+    assert store.document("agent_control")["enabled"] is True
     assert verify_backup_bundle(tmp_path / "bundle")["namespaces"] == [store.namespace]
 
 

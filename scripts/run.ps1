@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('local_simulation', 'kis_paper')][string] $Mode = 'local_simulation',
+    [ValidateSet('local_simulation', 'kis_paper', 'kis_live')][string] $Mode = 'local_simulation',
     [ValidateRange(1024, 65535)][int] $Port = 8000,
     [switch] $SkipSetup
 )
@@ -47,7 +47,7 @@ try {
         -RedirectStandardOutput (Join-Path $logs "worker-$runId.out.log") `
         -RedirectStandardError (Join-Path $logs "worker-$runId.err.log")
     Write-Host "invest-lab [$Mode] http://127.0.0.1:$Port"
-    Write-Host 'Press Ctrl+C to stop this server and its worker. Paper orders remain disabled unless explicitly configured.'
+    Write-Host 'Press Ctrl+C to stop this server and its worker. External orders require mode-specific settings and local controls.'
     Push-Location $backend
     try {
         & $python -m uvicorn invest_lab.adapters.http:create_app --factory --host 127.0.0.1 --port $Port

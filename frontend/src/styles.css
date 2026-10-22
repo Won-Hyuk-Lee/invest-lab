@@ -1995,3 +1995,9 @@ fieldset {
   cursor: pointer;
   color: #35456e;
 }
+.archive-navigation summary {
+  cursor: pointer;
+  padding: 14px;
+  color: #526176;
+  font-size: 13px;
+}

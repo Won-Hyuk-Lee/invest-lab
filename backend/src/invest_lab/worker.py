@@ -135,8 +135,9 @@ class WorkerStream:
             p["symbol"] for p in account.get("positions", []) if p.get("quantity", 0) > 0
         )
         watch = self.runtime.store.document("watchlist") or {}
-        candidates = [row["symbol"] for row in watch.get("items", [])][:20]
         deployment = self.runtime.store.document("deployment") or {}
+        candidate_limit = deployment.get("rules", {}).get("candidate_limit", 20)
+        candidates = [row["symbol"] for row in watch.get("items", [])][:candidate_limit]
         books = deployment.get("stream_books", False) is True
         signature = (tuple(holdings), tuple(candidates), books)
         if signature != self._last_configuration:
@@ -256,6 +257,11 @@ class Worker:
         runtime = self.runtime
         now = runtime.workspace.clock.now().astimezone(ZoneInfo("Asia/Seoul"))
         deployment = runtime.store.document("deployment")
+        if getattr(runtime, "execution_only", False):
+            # Reconcile even when no legacy strategy is selected. Never schedule it.
+            minute = now.strftime("%Y%m%d%H%M")
+            runtime.store.enqueue("reconcile", job_key=f"reconcile:{minute}")
+            return
         if runtime.store.mode != "kis_paper":
             # Synthetic fixture dates never become live calendar evidence.
             return
@@ -316,7 +322,9 @@ class Worker:
         if not job:
             return False
         try:
-            if job["kind"] == "research_experiment":
+            if job["kind"] == "research_experiment" and not getattr(
+                self.runtime, "execution_only", False
+            ):
                 if self.pool is None:
                     self.pool = ProcessPoolExecutor(max_workers=1)
                 repository = self.runtime.research.repository

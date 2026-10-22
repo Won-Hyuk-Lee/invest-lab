@@ -1,13 +1,15 @@
 # 다른 PC에서 시작하고 이어가기
 
+**현재 용도는 로컬 매매 도구다.** 기본 실행은 외부 AI/스크립트 판단과 주문·체결 관리이며 연구 데이터 이전은 필요할 때만 수행한다. 실행/모의 준비는 [로컬 매매 안내](local-trading.md)를 우선한다. 아래 과거 연구/전략 이전 설명은 보관 기능을 이어갈 때 참고한다.
+
 집과 사무실의 **Windows PC**에서 같은 저장소로 작업하는 절차다. 폴더 경로와 Windows 사용자명은 같을 필요가 없다. 아래 명령은 별도 설명이 없으면 `invest-lab` 저장소 루트의 PowerShell에서 실행한다.
 
 | 목적 | 준비물 |
 | --- | --- |
-| 화면/샘플 연구를 새로 실행 | 저장소 코드 + Git/uv/Node.js |
-| 한투 모의계좌 조회 | 위 항목 + 저장소 루트의 `.env` |
-| 기존 전략·수집 자료·연구·주문 이력까지 계속 사용 | 위 항목 + 기존 PC의 데이터 백업 bundle |
-| 실제 모의 자동 운용 | 키 외에 거래 달력·시장 자료·대조·운용 설정 준비. [사용자가 할 일](user-actions.md) 참고 |
+| 로컬 매매 화면과 합성 계좌 실행 | 저장소 코드 + Git/uv/Node.js |
+| 한투 모의/실전계좌 조회 | 위 항목 + 모드별 키가 있는 저장소 루트의 `.env` |
+| 기존 주문 이력/시장 자료를 이어 사용 | 위 항목 + 기존 PC의 데이터 백업 bundle |
+| 외부 판단으로 모의/실전 주문 | 종목 마스터·개장 달력·계좌 대조·주문 활성화/한도 설정. [로컬 매매 안내](local-trading.md) 참고 |
 
 Git에는 코드와 문서가 들어간다. `.env`와 실행 데이터는 Git에 없으므로 **pull만으로 기존 계좌 설정이나 연구 기록이 따라오지 않는다.**
 
@@ -90,14 +92,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run.ps1 -Mode kis_
 
 ## 5. 집 ↔ 사무실에서 코드 이어가기
 
-작업 시작 시 저장소 루트에서:
+2026-09-29 연구를 이어가려면 [작업 인계서](handoff-2026-09-29.md)를 먼저 읽는다. 현재 인계 브랜치는 `feature/real-data-backtest`이며 `main`에는 이번 변경이 없다. 저장소 루트에서 변경 사항을 확인하고 보존한 뒤:
 
 ```powershell
 git status --short --branch
-git pull --ff-only origin main
+git fetch origin
+git switch feature/real-data-backtest
+git pull --ff-only origin feature/real-data-backtest
 ```
 
-이 저장소의 기본 작업 브랜치는 `main`이다. 다른 작업 브랜치에 있으면 해당 작업의 브랜치 절차를 따른다. 변경 사항이 남았으면 먼저 확인하고 보존한다. fast-forward가 불가능하면 중단하고 분기된 커밋을 비교하며 `reset --hard`나 강제 push로 맞추지 않는다.
+로컬에 해당 브랜치가 없고 `origin`에만 있으면 `git switch`가 원격 추적 브랜치를 만든다. 자동 추적이 꺼진 환경에서는 `git switch --track origin/feature/real-data-backtest`를 사용한다. 명령이 실패하면 다음 단계로 진행하지 않는다. 다른 작업을 이어갈 때에는 해당 인계의 브랜치를 사용한다. fast-forward가 불가능하면 중단하고 분기된 커밋을 비교하며 `reset --hard`나 강제 push로 맞추지 않는다. 브랜치 간 병합은 PR로 수행한다.
 
 pull 이후에는 다시 설치/빌드하는 실행 명령을 쓴다.
 
@@ -110,6 +114,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run.ps1
 `.env`, `.local`, `.venv`, `node_modules`는 동기화되지 않는다. **집과 사무실에서 같은 모의계좌 작업자를 동시에 돌리지 않는다.** 서로의 실행권·호출 예산·주문 의도를 공유하지 않기 때문이다. 사무실에서 코드 수정이나 샘플 실행만 할 때는 기존 모의 운영 데이터를 옮길 필요가 없다.
 
 ## 6. 기존 데이터까지 이전하기
+
+이번 KRX/DART 연구는 아래의 앱 DB 백업과 별개인 원천·압축 결과 파일을 사용한다. [작업 인계서의 연구 자료 압축파일](handoff-2026-09-29.md#3-별도로-옮길-연구-자료)을 함께 가져와야 재수집 없이 이어갈 수 있다. 앱의 `backup` 명령만으로 임의 연구 폴더가 모두 포함되지는 않는다.
 
 기본 저장 위치는 `.local/`이다. 단순 개발/샘플 확인이면 이 절차를 건너뛸 수 있다. 계속 운영할 PC 하나를 정하고 그 PC의 데이터가 최신이라는 기준을 유지한다. DB 파일을 Git으로 병합하거나 실행 중인 `.local`을 동기화 프로그램으로 맞추지 않는다.
 

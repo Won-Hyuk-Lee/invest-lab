@@ -1,10 +1,11 @@
-// Explicit opt-in smoke test against an isolated local_simulation API + worker.
+// Explicit opt-in smoke against an isolated local_simulation API + worker.
 const { chromium } = require("playwright");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { randomUUID } = require("node:crypto");
 
-async function poll(read, accept, label, timeout = 90000) {
+async function poll(read, accept, label, timeout = 60000) {
   const end = Date.now() + timeout;
   while (Date.now() < end) {
     const value = await read();
@@ -17,21 +18,33 @@ async function poll(read, accept, label, timeout = 90000) {
 (async () => {
   const baseURL = process.env.INVEST_INTEGRATION_URL;
   if (!baseURL)
-    throw new Error(
-      "Set INVEST_INTEGRATION_URL to an isolated UI backed by a local_simulation API and worker.",
-    );
-  const target = new URL(baseURL);
-  if (!["127.0.0.1", "localhost"].includes(target.hostname))
-    throw new Error("Only an isolated loopback target is allowed.");
-  const contextInfo = await (await fetch(`${baseURL}/api/context`)).json();
+    throw new Error("Set INVEST_INTEGRATION_URL to an isolated API + worker.");
+  assert.ok(["127.0.0.1", "localhost"].includes(new URL(baseURL).hostname));
+  const read = async (route) => (await fetch(baseURL + route)).json();
+  const contextInfo = await read("/api/context");
   assert.equal(contextInfo.mode, "local_simulation");
   assert.equal(contextInfo.live_orders_enabled, false);
   assert.equal(
     contextInfo.readiness.find((r) => r.name === "worker")?.ready,
     true,
   );
+  assert.equal((await read("/api/trading")).execution_only, true);
   const output = path.resolve("test-results/integration");
   fs.mkdirSync(output, { recursive: true });
+  const initialPolicy = (await read("/api/trading")).control;
+  const pause = await fetch(`${baseURL}/api/trading/control`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      expected_version: initialPolicy.version,
+      enabled: false,
+      allowed_symbols: initialPolicy.allowed_symbols,
+      max_order_value: initialPolicy.max_order_value,
+      max_position_pct: initialPolicy.max_position_pct,
+      max_invested_pct: initialPolicy.max_invested_pct,
+    }),
+  });
+  assert.equal(pause.status, 200);
   const browser = await chromium.launch({
     channel:
       process.env.PW_CHANNEL ??
@@ -44,132 +57,151 @@ async function poll(read, accept, label, timeout = 90000) {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const report = {};
-  const account = async () => (await fetch(`${baseURL}/api/portfolio`)).json();
+  const account = () => read("/api/portfolio");
+  const quantity = (a) =>
+    a.positions.find((p) => p.symbol === "005930")?.quantity ?? 0;
+  const makeSignal = (side, changes = {}) => ({
+    client_request_id: randomUUID(),
+    symbol: "005930",
+    side,
+    quantity: 1,
+    order_type: "market",
+    limit_price: null,
+    source: "browser-smoke",
+    reason: "격리된 로컬 실행 확인",
+    expires_at: new Date(Date.now() + 120000).toISOString(),
+    ...changes,
+  });
+  const inspect = async (signal) => {
+    await page
+      .getByLabel("판단 JSON", { exact: true })
+      .fill(JSON.stringify(signal, null, 2));
+    await page
+      .getByRole("button", { name: "전송 없이 검사", exact: true })
+      .click();
+  };
+  const submitAndFill = async (signal) => {
+    await inspect(signal);
+    await page.getByText(/검사 완료 · 예상 주문금액/).waitFor();
+    await page
+      .getByRole("button", { name: "검사한 판단으로 주문 요청", exact: true })
+      .click();
+    return poll(
+      () => read(`/api/trading/signals/${signal.client_request_id}`),
+      (o) => o.state === "filled",
+      `${signal.side} fill`,
+    );
+  };
   try {
-    const before = await account();
-    const beforeQuantity =
-      before.positions.find((p) => p.symbol === "005930")?.quantity ?? 0;
-    await page.goto(`${baseURL}/market/005930`);
+    const beforeQuantity = quantity(await account());
+    await page.goto(baseURL);
     await page
-      .getByRole("button", { name: "주문 내용 등록", exact: true })
-      .click();
-    await page
-      .getByRole("button", { name: "등록한 주문 전송", exact: true })
-      .click();
-    await page
-      .getByText(/삼성|005930/)
-      .first()
+      .getByRole("heading", { name: "로컬 매매 도구", exact: true })
       .waitFor();
+    await page.getByLabel("허용 종목 코드", { exact: true }).fill("005930");
     await page
-      .getByText(/005930 · 매수 · 체결 완료/)
-      .waitFor({ timeout: 60000 });
+      .getByLabel("주문당 최대 금액 (원)", { exact: true })
+      .fill("1000000");
+    const version = (await read("/api/trading")).control.version;
+    await page.getByRole("button", { name: "설정 저장", exact: true }).click();
+    await poll(
+      () => read("/api/trading"),
+      (s) => s.control.version > version,
+      "policy save",
+    );
+    await page.waitForLoadState("networkidle");
+    await page
+      .getByRole("button", {
+        name: "저장하고 외부 자동 주문 허용",
+        exact: true,
+      })
+      .click();
+    await poll(
+      () => read("/api/trading"),
+      (s) => s.control.enabled,
+      "external orders enabled",
+    );
+    await page.getByRole("heading", { name: "허용", exact: true }).waitFor();
+    const buy = makeSignal("buy");
+    const bought = await submitAndFill(buy);
     await poll(
       account,
-      (a) =>
-        (a.positions.find((p) => p.symbol === "005930")?.quantity ?? 0) ===
-        beforeQuantity + 1,
-      "buy reflected in account",
+      (a) => quantity(a) === beforeQuantity + 1,
+      "buy position",
     );
-    await page.getByRole("link", { name: "주문 상세·체결 확인" }).click();
+    const duplicate = await fetch(`${baseURL}/api/trading/signals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buy),
+    });
+    const duplicateBody = await duplicate.json();
+    assert.equal(duplicate.status, 202, JSON.stringify(duplicateBody));
+    assert.equal(duplicateBody.id, bought.id);
+    report.buy = "JSON decision filled; same ID returned the same order";
+    await page
+      .getByRole("link", { name: "주문 상세 확인", exact: true })
+      .click();
     await page
       .getByRole("heading", { name: "주문 상세", exact: true })
       .waitFor();
-    report.buy = "filled and position increased by one";
-    await page.goto(`${baseURL}/market/005930`);
+    await page.goto(baseURL);
     await page
-      .getByRole("button", { name: "별도 새 주문 입력", exact: true })
+      .getByRole("button", { name: "새 판단 예시 만들기", exact: true })
       .click();
-    await page.getByLabel("매매 구분", { exact: true }).selectOption("sell");
+    await submitAndFill(makeSignal("sell"));
+    await poll(account, (a) => quantity(a) === beforeQuantity, "sell position");
+    report.sell = "JSON sell filled; holdings returned to baseline";
+    const count = (await read("/api/trading")).signals.length;
+    await page.getByLabel("판단 JSON", { exact: true }).fill("{");
     await page
-      .getByRole("button", { name: "주문 내용 등록", exact: true })
+      .getByRole("button", { name: "전송 없이 검사", exact: true })
       .click();
-    await page
-      .getByRole("button", { name: "등록한 주문 전송", exact: true })
-      .click();
-    await page
-      .getByText(/005930 · 매도 · 체결 완료/)
-      .waitFor({ timeout: 60000 });
-    await poll(
-      account,
-      (a) =>
-        (a.positions.find((p) => p.symbol === "005930")?.quantity ?? 0) ===
-        beforeQuantity,
-      "sell reflected in account",
+    await page.locator(".error-box").first().waitFor();
+    assert.equal(
+      await page
+        .getByRole("button", { name: "검사한 판단으로 주문 요청", exact: true })
+        .isEnabled(),
+      false,
     );
-    report.sell = "filled and position returned to baseline";
+    await page
+      .getByRole("button", { name: "새 판단 예시 만들기", exact: true })
+      .click();
+    await inspect(makeSignal("buy", { quantity: 1000 }));
+    await page.getByText(/한 주문의 금액 한도를 초과합니다/).waitFor();
+    assert.equal((await read("/api/trading")).signals.length, count);
+    report.invalid = "Malformed JSON and amount limit prevented registration";
+    await page
+      .getByRole("button", { name: "외부 자동 주문 중지", exact: true })
+      .click();
+    await poll(
+      () => read("/api/trading"),
+      (s) => !s.control.enabled,
+      "external stop",
+    );
+    await page
+      .getByRole("button", { name: "새 판단 예시 만들기", exact: true })
+      .click();
+    await inspect(makeSignal("buy"));
+    await page.getByText(/검사 완료 · 예상 주문금액/).waitFor();
+    assert.equal(
+      await page
+        .getByRole("button", { name: "검사한 판단으로 주문 요청", exact: true })
+        .isEnabled(),
+      false,
+    );
+    report.stop = "Stopped policy permits preview but disables submission";
+    await page.screenshot({
+      path: path.join(output, "trading.png"),
+      fullPage: true,
+    });
     await page.goto(`${baseURL}/orders`);
-    await page.getByRole("heading", { name: "주문과 체결" }).waitFor();
+    await page
+      .getByRole("heading", { name: "주문과 체결", exact: true })
+      .waitFor();
     await page.screenshot({
       path: path.join(output, "orders.png"),
       fullPage: true,
     });
-    await page.goto(`${baseURL}/research`);
-    const datasetsBefore = (
-      await (await fetch(`${baseURL}/api/research`)).json()
-    ).datasets;
-    if (!datasetsBefore.length) {
-      await page.getByText("데이터 가져오기", { exact: true }).click();
-      await page
-        .getByRole("button", { name: "명시적으로 연습 데이터 생성" })
-        .click();
-    }
-    const research = await poll(
-      async () => (await fetch(`${baseURL}/api/research`)).json(),
-      (r) => r.datasets.length > 0,
-      "synthetic research dataset",
-    );
-    const dataset = research.datasets.find(
-      (d) => d.source_kind === "synthetic",
-    );
-    assert.ok(
-      dataset,
-      "This smoke test only trains an explicitly synthetic dataset",
-    );
-    report.dataset = dataset.id;
-    await page.reload();
-    await page.getByRole("tab", { name: "피처", exact: true }).click();
-    await page.locator(".table-scroll tbody tr").first().waitFor();
-    report.features = "rendered from actual service";
-    await page.getByRole("tab", { name: "백테스트·비교", exact: true }).click();
-    await page.getByLabel("데이터셋", { exact: true }).selectOption(dataset.id);
-    await page.getByRole("button", { name: "실험 실행", exact: true }).click();
-    await page
-      .getByRole("heading", { name: "전략별 비용 후 성과", exact: true })
-      .waitFor({ timeout: 120000 });
-    report.backtest = "job result and equity curve rendered";
-    await page.screenshot({
-      path: path.join(output, "backtest.png"),
-      fullPage: true,
-    });
-    await page.getByRole("tab", { name: "통계 모델", exact: true }).click();
-    await page.getByLabel("데이터셋", { exact: true }).selectOption(dataset.id);
-    await page
-      .getByRole("button", { name: "학습·검증 실행", exact: true })
-      .click();
-    await page
-      .getByRole("heading", { name: "모델의 미사용 구간 평가", exact: true })
-      .waitFor({ timeout: 180000 });
-    report.training = "Ridge holdout metrics and lineage rendered";
-    await page.screenshot({
-      path: path.join(output, "training.png"),
-      fullPage: true,
-    });
-    await page.goto(`${baseURL}/operations`);
-    await page
-      .getByRole("heading", { name: "운영 상태", exact: true })
-      .waitFor();
-    await page
-      .getByLabel("작업 종류", { exact: true })
-      .selectOption("daily_pipeline");
-    await page.getByRole("button", { name: "작업 요청", exact: true }).click();
-    await poll(
-      async () => (await fetch(`${baseURL}/api/reports`)).json(),
-      (r) => r.daily.length > 0,
-      "daily report",
-    );
-    await page.goto(`${baseURL}/reports`);
-    await page.locator(".table-scroll tbody tr").first().waitFor();
-    report.reports = "daily snapshot visible";
     report.javascriptErrors = errors;
     assert.deepEqual(errors, []);
     fs.writeFileSync(

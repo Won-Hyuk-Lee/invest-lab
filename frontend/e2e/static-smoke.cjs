@@ -40,16 +40,7 @@ const path = require("node:path");
       mutations.push(request.url());
   });
   try {
-    for (const route of [
-      "/",
-      "/market/005930",
-      "/orders",
-      "/strategies",
-      "/watchlist",
-      "/research",
-      "/reports",
-      "/operations",
-    ]) {
+    for (const route of ["/", "/orders", "/operations", "/settings"]) {
       const response = await page.goto(baseURL + route);
       assert.equal(response.status(), 200, route);
       await page.locator("main h1, main h2").first().waitFor();
@@ -76,7 +67,7 @@ const path = require("node:path");
       fullPage: true,
     });
     console.log(
-      "Compiled assets, eight direct routes and reloads passed; no JavaScript errors or write requests.",
+      "Compiled assets, four direct routes and reloads passed; no JavaScript errors or write requests.",
     );
   } finally {
     await browser.close();
