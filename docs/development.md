@@ -1,5 +1,7 @@
 # 개발 실행·검증·인계
 
+**2026-10-22:** 기존 개발 작업은 PR #1로 `main`에 통합됐다. 현재 코드 수신은 [PC 동기화 안내](workstation-setup.md#5-집--사무실에서-코드-이어가기), 이번 검증과 비밀정보 감사는 [통합 확인 기록](repository-review-2026-10-22.md)을 따른다.
+
 현재 변경의 확인 결과와 실전 미검증 범위는 [2026-09-30 전환 기록](local-trading-transition-2026-09-30.md)에 있다.
 
 **2026-09-30 전환:** 기본 `INVEST_WORKSPACE=execution`은 외부 판단 주문 큐·대조를 처리하고 기존 연구/내장 전략 자동 운용을 실행하지 않는다. 새 실행 흐름과 API/CLI 계약은 [로컬 매매 안내](local-trading.md), 과거 연구는 [보관 목록](research-archive.md)을 따른다. 아래 연구 인계 기록은 과거 상태이며 현재 제품 방향이 아니다.
@@ -152,7 +154,7 @@ npm run dev
 
 화면은 `http://127.0.0.1:5173`이다. 종료할 때 각 터미널에서 `Ctrl+C`를 누른다. Linux 브라우저 테스트는 `npx playwright install --with-deps chromium`, macOS는 `npx playwright install chromium`으로 준비한다.
 
-## 6. 현재 인계 상태
+## 6. 이전 연구 인계 기록
 
 2026-09-29 매도·포트폴리오 정책 및 비교 재생 변경은 [구현 기록](sell-engine-implementation-2026-09-29.md), 18개 조건의 결과와 자료 한계는 [비교 보고서](sell-engine-backtest-2026-09-29.md)를 참고한다. 백엔드 299개 테스트와 독립 원장 대조는 통과했지만, 배당·권리/PIT 자료와 실제 장중 모의 운영 게이트는 미완료다.
 

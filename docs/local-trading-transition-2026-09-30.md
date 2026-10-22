@@ -41,4 +41,4 @@ FastAPI 테스트에서 기존 httpx/Starlette 호환성 deprecation 경고 1개
 
 미국 상장 ETF 직접 주문, 신용·미수·공매도·NXT/SOR, 실전 WebSocket 체결통보는 구현 범위에 포함하지 않는다. 실전은 분 단위 및 제출 직후 REST 대조를 사용한다.
 
-코드/공유 문서는 현재 `feature/real-data-backtest` 브랜치에서 작업 단위별로 커밋한다. `.env`, 실행 DB, 토큰 캐시, 큰 검증 산출물은 Git에 포함하지 않는다. 커밋·푸시는 2026-09-30의 후속 사용자 지시에 따라 진행한다.
+이 변경은 당시 `feature/real-data-backtest`에서 작업 단위별로 커밋했다. 2026-10-22 PR #1로 `main`에 통합하고 이전 브랜치를 삭제했다. 현재 코드는 `main`에서 받는다. `.env`, 실행 DB, 토큰 캐시, 큰 검증 산출물은 Git에 포함하지 않는다.

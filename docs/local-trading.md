@@ -93,9 +93,9 @@ AI 서비스 키는 AI를 호출하는 외부 프로그램에서 관리한다. �
 
 ```powershell
 .\scripts\manage.ps1 trading-status
-.\scripts\manage.ps1 trading-control .\.local\agent-control.json
-.\scripts\manage.ps1 signal-preview .\.local\signal.json
-.\scripts\manage.ps1 signal-submit .\.local\signal.json
+.\scripts\manage.ps1 trading-control "$PWD\.local\agent-control.json"
+.\scripts\manage.ps1 signal-preview "$PWD\.local\signal.json"
+.\scripts\manage.ps1 signal-submit "$PWD\.local\signal.json"
 .\scripts\manage.ps1 signal-status '판단 UUID'
 ```
 

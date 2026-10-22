@@ -92,16 +92,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run.ps1 -Mode kis_
 
 ## 5. 집 ↔ 사무실에서 코드 이어가기
 
-2026-09-29 연구를 이어가려면 [작업 인계서](handoff-2026-09-29.md)를 먼저 읽는다. 현재 인계 브랜치는 `feature/real-data-backtest`이며 `main`에는 이번 변경이 없다. 저장소 루트에서 변경 사항을 확인하고 보존한 뒤:
+2026-10-22 기존 연구·로컬 매매 작업을 `main`에 통합하고 이전 개발 브랜치를 삭제했다. 현재 실행 안내는 [README](../README.md), 과거 연구 자료 이전은 [작업 인계서](handoff-2026-09-29.md)를 따른다. 실행 중인 앱을 종료하고 저장소 루트에서 변경 사항을 확인·보존한 뒤:
 
 ```powershell
 git status --short --branch
-git fetch origin
-git switch feature/real-data-backtest
-git pull --ff-only origin feature/real-data-backtest
+git fetch --prune origin
+git switch main
+git pull --ff-only origin main
 ```
 
-로컬에 해당 브랜치가 없고 `origin`에만 있으면 `git switch`가 원격 추적 브랜치를 만든다. 자동 추적이 꺼진 환경에서는 `git switch --track origin/feature/real-data-backtest`를 사용한다. 명령이 실패하면 다음 단계로 진행하지 않는다. 다른 작업을 이어갈 때에는 해당 인계의 브랜치를 사용한다. fast-forward가 불가능하면 중단하고 분기된 커밋을 비교하며 `reset --hard`나 강제 push로 맞추지 않는다. 브랜치 간 병합은 PR로 수행한다.
+로컬에 `main`이 없고 `origin/main`만 있으면 `git switch --track origin/main`을 사용한다. 명령이 실패하면 다음 단계로 진행하지 않는다. 다른 PC에 남아 있는 이전 개발 브랜치의 미푸시 커밋은 확인 없이 삭제하지 않는다. fast-forward가 불가능하면 중단하고 분기된 커밋을 비교하며 `reset --hard`나 강제 push로 맞추지 않는다. 새 브랜치 간 병합은 PR로 수행한다.
 
 pull 이후에는 다시 설치/빌드하는 실행 명령을 쓴다.
 
